@@ -12,17 +12,6 @@ from Tools.HardwareInfo import HardwareInfo
 
 config.misc.showtestcard = ConfigBoolean(default = False)
 
-boxtype = getBoxType()
-
-has_rca = getHaveRCA() in ('True',)
-has_dvi = getHaveDVI() in ('True',)
-has_jack = getHaveAVJACK() in ('True',)
-has_scart = getHaveSCART() in ('True',)
-
-if boxtype == 'dm8000' or boxtype == 'dm800':
-	has_dvi = True
-
-
 class VideoWizardSummary(WizardSummary):
 	def __init__(self, session, parent):
 		WizardSummary.__init__(self, session, parent)
