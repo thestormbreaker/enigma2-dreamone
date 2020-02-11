@@ -2,9 +2,12 @@ from config import config, ConfigSlider, ConfigSelection, ConfigYesNo, \
 	ConfigOnOff, ConfigSubsection, ConfigBoolean, ConfigSelectionNumber, ConfigNothing, NoSave
 from enigma import eAVSwitch, getDesktop, eDVBServicePMTHandler
 from SystemInfo import SystemInfo
+from Tools.HardwareInfo import HardwareInfo
 from os import path as os_path
 
 class AVSwitch:
+	hw_type = HardwareInfo().get_device_name()
+	
 	def setInput(self, input):
 		INPUT = { "ENCODER": 0, "SCART": 1, "AUX": 2 }
 		eAVSwitch.getInstance().setInput(INPUT[input])
