@@ -261,15 +261,14 @@ class AVSwitch:
 		eAVSwitch.getInstance().setInput(INPUT[input])
 
 	def setColorFormat(self, value):
-		if not self.current_port:
-			self.current_port = config.av.videoport.value
-		if self.current_port in ("YPbPr", "Scart-YPbPr"):
-			eAVSwitch.getInstance().setColorFormat(3)
-		elif self.current_port in ("RCA"):
-			eAVSwitch.getInstance().setColorFormat(0)
-		else:
-			eAVSwitch.getInstance().setColorFormat(value)
-
+		eAVSwitch.getInstance().setColorFormat(value)	
+		
+	def setAspectRatio(self, value):
+		eAVSwitch.getInstance().setAspectRatio(value)	
+		
+	def setSystem(self, value):
+		eAVSwitch.getInstance().setVideomode(value)	
+		
 	def setConfiguredMode(self):
 		port = config.av.videoport.value
 		if port not in config.av.videomode:
@@ -315,37 +314,27 @@ class AVSwitch:
 			f.close()
 
 	def getOutputAspect(self):
-		ret = (16,9)
-		port = config.av.videoport.value
-		if port not in config.av.videomode:
-			print "[VideoHardware] current port not available in getOutputAspect!!! force 16:9"
-		else:
-			mode = config.av.videomode[port].value
-			force_widescreen = self.isWidescreenMode(port, mode)
-			is_widescreen = force_widescreen or config.av.aspect.value in ("16:9", "16:10")
-			is_auto = config.av.aspect.value == "auto"
-			if is_widescreen:
-				if force_widescreen:
-					pass
-				else:
-					aspect = {"16:9": "16:9", "16:10": "16:10"}[config.av.aspect.value]
-					if aspect == "16:10":
-						ret = (16,10)
-			elif is_auto:
-				try:
-					aspect_str = open("/proc/stb/vmpeg/0/aspect", "r").read()
-					if aspect_str == "1": # 4:3
-						ret = (4,3)
-				except IOError:
-					pass
-			else:  # 4:3
-				ret = (4,3)
-		return ret
+		return (16,9) # this function is very old... for analog TVs with different pixel aspect ratio .. for modern digital TVs 16:9 is always okay...
+		valstr = config.av.aspectratio.value
+		if valstr in ("4_3_letterbox", "4_3_panscan"): # 4:3
+			return (4,3)
+		elif valstr == "16_9": # auto ... 4:3 or 16:9
+			try:
+				aspect_str = open("/proc/stb/vmpeg/0/aspect", "r").read()
+				if aspect_str[0] == "2": # 4:3
+					return (4,3)
+			except IOError:
+				pass
+		elif valstr in ("16_9_always", "16_9_letterbox"): # 16:9
+			pass
+		elif valstr in ("16_10_letterbox", "16_10_panscan"): # 16:10
+			return (16,10)
+		return (16,9)
 
 	def getFramebufferScale(self):
 		aspect = self.getOutputAspect()
 		fb_size = getDesktop(0).size()
-		return aspect[0] * fb_size.height(), aspect[1] * fb_size.width()
+		return (aspect[0] * fb_size.height(), aspect[1] * fb_size.width())
 
 	def getAspectRatioSetting(self):
 		valstr = config.av.aspectratio.value
@@ -365,89 +354,81 @@ class AVSwitch:
 			val = 6
 		return val
 
+	def setAspectWSS(self, aspect=None):
+		if not config.av.wss.value:
+			value = 2 # auto(4:3_off)
+		else:
+			value = 1 # auto
+		eAVSwitch.getInstance().setWSS(value)
+		
 iAVSwitch = AVSwitch()
 
 def InitAVSwitch():
-	config.av.yuvenabled = ConfigBoolean(default=True)
+	try:
+		x = config.av
+	except KeyError:
+		config.av = ConfigSubsection()
+	config.av.yuvenabled = ConfigBoolean(default=False)
 	colorformat_choices = {"cvbs": _("CVBS"), "rgb": _("RGB"), "svideo": _("S-Video")}
+
+	try:
+		have_analog_output = open("/proc/stb/video/mode_choices", "r").read()[:-1].find("PAL") != -1
+	except:
+		have_analog_output = False
+
+	SystemInfo["AnalogOutput"] = have_analog_output
+
 	# when YUV is not enabled, don't let the user select it
-	if config.av.yuvenabled.value:
+	if config.av.yuvenabled.value and have_analog_output:
 		colorformat_choices["yuv"] = _("YPbPr")
 
-	config.av.autores = ConfigSelection(choices={"disabled": _("Disabled"), "all": _("All resolutions"), "hd": _("only HD")}, default="disabled")
-	choicelist = []
-	for i in range(5, 16):
-		choicelist.append(("%d" % i, ngettext("%d second", "%d seconds", i) % i))
-	config.av.autores_label_timeout = ConfigSelection(default = "5", choices = [("0", _("Not Shown"))] + choicelist)
-	config.av.autores_delay = ConfigSelectionNumber(min = 0, max = 15000, stepwidth = 500, default = 500, wraparound = True)
-	config.av.autores_deinterlace = ConfigYesNo(default=False)
-	config.av.autores_sd = ConfigSelection(choices={"720p": _("720p"), "1080i": _("1080i")}, default="720p")
-	config.av.autores_480p24 = ConfigSelection(choices={"480p24": _("480p 24Hz"), "720p24": _("720p 24Hz"), "1080p24": _("1080p 24Hz")}, default="1080p24")
-	config.av.autores_720p24 = ConfigSelection(choices={"720p24": _("720p 24Hz"), "1080p24": _("1080p 24Hz")}, default="1080p24")
-	config.av.autores_1080p24 = ConfigSelection(choices={"1080p24": _("1080p 24Hz"), "1080p25": _("1080p 25Hz")}, default="1080p24")
-	config.av.autores_1080p25 = ConfigSelection(choices={"1080p25": _("1080p 25Hz"), "1080p50": _("1080p 50Hz")}, default="1080p25")
-	config.av.autores_1080p30 = ConfigSelection(choices={"1080p30": _("1080p 30Hz"), "1080p60": _("1080p 60Hz")}, default="1080p30")
-	config.av.autores_2160p24 = ConfigSelection(choices={"2160p24": _("2160p 24Hz"), "2160p25": _("2160p 25Hz"), "2160p30": _("2160p 30Hz")}, default="2160p24")
-	config.av.autores_2160p25 = ConfigSelection(choices={"2160p25": _("2160p 25Hz"), "2160p50": _("2160p 50Hz")}, default="2160p25")
-	config.av.autores_2160p30 = ConfigSelection(choices={"2160p30": _("2160p 30Hz"), "2160p60": _("2160p 60Hz")}, default="2160p30")
 	config.av.colorformat = ConfigSelection(choices=colorformat_choices, default="rgb")
 	config.av.aspectratio = ConfigSelection(choices={
 			"4_3_letterbox": _("4:3 Letterbox"),
-			"4_3_panscan": _("4:3 PanScan"),
-			"16_9": _("16:9"),
+			"4_3_panscan": _("4:3 PanScan"), 
+			"16_9": _("16:9"), 
 			"16_9_always": _("16:9 always"),
 			"16_10_letterbox": _("16:10 Letterbox"),
-			"16_10_panscan": _("16:10 PanScan"),
-			"16_9_letterbox": _("16:9 Letterbox")},
-			default = "16_9")
-	config.av.aspect = ConfigSelection(choices={
-			"4:3": _("4:3"),
-			"16:9": _("16:9"),
-			"16:10": _("16:10"),
-			"auto": _("Automatic")},
-			default = "16:9")
-	policy2_choices = {
-	# TRANSLATORS: (aspect ratio policy: black bars on top/bottom) in doubt, keep english term.
-	"letterbox": _("Letterbox"),
-	# TRANSLATORS: (aspect ratio policy: cropped content on left/right) in doubt, keep english term
-	"panscan": _("Pan&scan"),
-	# TRANSLATORS: (aspect ratio policy: display as fullscreen, even if this breaks the aspect)
-	"scale": _("Just scale")}
-	if os.path.exists("/proc/stb/video/policy2_choices"):
-		f = open("/proc/stb/video/policy2_choices")
-		if "auto" in f.readline():
-			# TRANSLATORS: (aspect ratio policy: always try to display as fullscreen, when there is no content (black bars) on left/right, even if this breaks the aspect.
-			policy2_choices.update({"auto": _("Auto")})
-		f.close()
-	config.av.policy_169 = ConfigSelection(choices=policy2_choices, default = "letterbox")
-	policy_choices = {
-	# TRANSLATORS: (aspect ratio policy: black bars on left/right) in doubt, keep english term.
-	"panscan": _("Pillarbox"),
-	# TRANSLATORS: (aspect ratio policy: cropped content on left/right) in doubt, keep english term
-	"letterbox": _("Pan&scan"),
-	# TRANSLATORS: (aspect ratio policy: display as fullscreen, with stretching the left/right)
-	# "nonlinear": _("Nonlinear"),
-	# TRANSLATORS: (aspect ratio policy: display as fullscreen, even if this breaks the aspect)
-	"bestfit": _("Just scale")}
-	if os.path.exists("/proc/stb/video/policy_choices"):
-		f = open("/proc/stb/video/policy_choices")
-		if "auto" in f.readline():
-			# TRANSLATORS: (aspect ratio policy: always try to display as fullscreen, when there is no content (black bars) on left/right, even if this breaks the aspect.
-			policy_choices.update({"auto": _("Auto")})
-		f.close()
-	config.av.policy_43 = ConfigSelection(choices=policy_choices, default = "panscan")
+			"16_10_panscan": _("16:10 PanScan"), 
+			"16_9_letterbox": _("16:9 Letterbox")}, 
+			default = "4_3_letterbox")
+
 	config.av.tvsystem = ConfigSelection(choices = {"pal": _("PAL"), "ntsc": _("NTSC"), "multinorm": _("multinorm")}, default="pal")
-	config.av.wss = ConfigEnableDisable(default = True)
-	config.av.generalAC3delay = ConfigSelectionNumber(-1000, 1000, 5, default = 0)
-	config.av.generalPCMdelay = ConfigSelectionNumber(-1000, 1000, 5, default = 0)
-	config.av.vcrswitch = ConfigEnableDisable(default = False)
+	config.av.wss = ConfigOnOff(default = True)
+	config.av.vcrswitch = ConfigOnOff(default = False)
 
-	config.av.aspect.setValue('16:9')
-	config.av.aspect.addNotifier(iAVSwitch.setAspect)
-	config.av.wss.addNotifier(iAVSwitch.setWss)
-	config.av.policy_43.addNotifier(iAVSwitch.setPolicy43)
-	config.av.policy_169.addNotifier(iAVSwitch.setPolicy169)
+	def setColorFormat(configElement):
+		map = {"cvbs": 0, "rgb": 1, "svideo": 2, "yuv": 3}
+		iAVSwitch.setColorFormat(map[configElement.value])
 
+	def setAspectRatio(configElement):
+		map = {"4_3_letterbox": 0, "4_3_panscan": 1, "16_9": 2, "16_9_always": 3, "16_10_letterbox": 4, "16_10_panscan": 5, "16_9_letterbox" : 6}
+		iAVSwitch.setAspectRatio(map[configElement.value])
+
+	def setSystem(configElement):
+		map = {"pal": 0, "ntsc": 1, "multinorm" : 2}
+		iAVSwitch.setSystem(map[configElement.value])
+
+	def setWSS(configElement):
+		iAVSwitch.setAspectWSS()
+
+	try:
+		have_analog_output = open("/proc/stb/video/mode_choices", "r").read()[:-1].find("PAL") != -1
+	except:
+		have_analog_output = False
+
+	SystemInfo["AnalogOutput"] = have_analog_output
+
+	if have_analog_output:
+		# this will call the "setup-val" initial
+		config.av.colorformat.addNotifier(setColorFormat)
+		config.av.aspectratio.addNotifier(setAspectRatio)
+		config.av.tvsystem.addNotifier(setSystem)
+		config.av.wss.addNotifier(setWSS)
+
+	iAVSwitch.setInput("ENCODER") # init on startup
+	SystemInfo["ScartSwitch"] = eAVSwitch.getInstance().haveScartSwitch()
+	
 	def setHDMIColorspace(configElement):
 		try:
 			f = open(SystemInfo["havecolorspace"], "w")
