@@ -2,7 +2,7 @@
 from Screens.Wizard import WizardSummary
 from Screens.WizardLanguage import WizardLanguage
 from Screens.Rc import Rc
-from Components.AVSwitch import iAVSwitch
+
 
 from Components.Pixmap import Pixmap
 from Components.config import config, ConfigBoolean, configfile
