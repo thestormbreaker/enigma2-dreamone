@@ -1,8 +1,8 @@
-
+from boxbranding import getBoxType, getMachineName, getHaveRCA, getHaveDVI, getHaveSCART, getHaveAVJACK
 from Screens.Wizard import WizardSummary
 from Screens.WizardLanguage import WizardLanguage
 from Screens.Rc import Rc
-
+from Components.AVSwitch import iAVSwitch
 
 from Components.Pixmap import Pixmap
 from Components.config import config, ConfigBoolean, configfile
@@ -11,6 +11,14 @@ from Tools.Directories import resolveFilename, SCOPE_SKIN, SCOPE_ACTIVE_SKIN
 from Tools.HardwareInfo import HardwareInfo
 
 config.misc.showtestcard = ConfigBoolean(default = False)
+
+boxtype = getBoxType()
+
+has_rca = getHaveRCA() in ('True',)
+has_dvi = getHaveDVI() in ('True',)
+has_jack = getHaveAVJACK() in ('True',)
+has_scart = getHaveSCART() in ('True',)
+
 
 class VideoWizardSummary(WizardSummary):
 	def __init__(self, session, parent):
