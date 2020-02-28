@@ -11,7 +11,6 @@ import os
 config.av = ConfigSubsection()
 
 class AVSwitch:
-
 	has_rca = getHaveRCA() in ('True',)
 	has_dvi = getHaveDVI() in ('True',)
 	has_jack = getHaveAVJACK() in ('True',)
@@ -411,8 +410,8 @@ def InitAVSwitch():
 			default = "4_3_letterbox")
 	
 	config.av.tvsystem = ConfigSelection(choices = {"pal": _("PAL"), "ntsc": _("NTSC"), "multinorm": _("multinorm")}, default="pal")
-	config.av.wss = ConfigOnOff(default = True)
-	config.av.vcrswitch = ConfigOnOff(default = False)
+	config.av.wss = ConfigEnableDisable(default = True)
+	config.av.vcrswitch = ConfigEnableDisable(default = False)
 	
 	config.av.aspect = ConfigSelection(choices={
 			"4:3": _("4:3"),
@@ -596,7 +595,7 @@ def InitAVSwitch():
 			print "[VideoHardware] couldn't write pep_scaler_sharpness"
 
 	
-	(configElement):
+	def setColorFormat(configElement):
 		if config.av.videoport and config.av.videoport.value in ("YPbPr", "Scart-YPbPr"):
 			iAVSwitch.setColorFormat(3)
 		elif config.av.videoport and config.av.videoport.value in ("RCA"):
