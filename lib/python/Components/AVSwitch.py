@@ -305,14 +305,24 @@ class AVSwitch:
 			f.close()
 
 	def setPolicy43(self, cfgelement):
-		print "[VideoHardware] setting policy: %s" % cfgelement.value
-		f = open("/proc/stb/video/policy", "w")
-		f.write(cfgelement.value)
-		f.close()
+		print "[AVSwitch] setting policy: %s" % cfgelement.value
+		arw = "0"
+		try:
+			if about.getChipSetString() in ('meson-6', 'meson-64'):
+				if cfgelement.value == "panscan" : arw = "11"
+				if cfgelement.value == "letterbox" : arw = "12"
+				if cfgelement.value == "bestfit" : arw = "10"
+				open("/sys/class/video/screen_mode", "w").write(arw)
+			else:
+				f = open("/proc/stb/video/policy", "w")
+				f.write(cfgelement.value)
+				f.close()
+		except IOError:
+			print "[AVSwitch] setting policy43 failed."
 
 	def setPolicy169(self, cfgelement):
 		if os.path.exists("/proc/stb/video/policy2"):
-			print "[VideoHardware] setting policy2: %s" % cfgelement.value
+			print "[AVSwitch] setting policy2: %s" % cfgelement.value
 			f = open("/proc/stb/video/policy2", "w")
 			f.write(cfgelement.value)
 			f.close()
