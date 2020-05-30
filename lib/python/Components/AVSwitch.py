@@ -16,6 +16,7 @@ has_dvi = False
 has_hdmi = False
 has_rca = False
 has_avjack = False
+
 has_scart = SystemInfo['HAVESCART']
 has_scartyuv = SystemInfo['HAVESCARTYUV']
 has_yuv = SystemInfo['HAVEYUV']
@@ -788,9 +789,21 @@ def InitAVSwitch():
 		return (choicesx, defaultx)
 
 	iAVSwitch.setInput("ENCODER") # init on startup
-	SystemInfo["ScartSwitch"] = eAVSwitch.getInstance().haveScartSwitch()
+	if (getBoxType() in ('gbquad', 'gbquadplus', 'et5x00', 'ixussone', 'ixusszero', 'axodin', 'axodinc', 'starsatlx', 'galaxym6', 'geniuse3hd', 'evoe3hd', 'axase3', 'axase3c', 'omtimussos1', 'omtimussos2', 'gb800seplus', 'gb800ueplus', 'gbultrase', 'gbultraue', 'gbultraueh' , 'twinboxlcd' )) or about.getModelString() == 'et6000':
+		detected = False
+	else:
+		detected = eAVSwitch.getInstance().haveScartSwitch()
 
-	if SystemInfo["Canedidchecking"]:
+	SystemInfo["ScartSwitch"] = detected
+
+	if os.path.exists("/proc/stb/hdmi/bypass_edid_checking"):
+		f = open("/proc/stb/hdmi/bypass_edid_checking", "r")
+		can_edidchecking = f.read().strip().split(" ")
+		f.close()
+	else:
+		can_edidchecking = False
+
+	SystemInfo["Canedidchecking"] = can_edidchecking
 		def setEDIDBypass(configElement):
 			try:
 				f = open("/proc/stb/hdmi/bypass_edid_checking", "w")
