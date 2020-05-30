@@ -17,7 +17,7 @@ has_hdmi = False
 has_rca = False
 has_avjack = False
 
-has_scart = SystemInfo['HAVESCART']
+
 has_scartyuv = SystemInfo['HAVESCARTYUV']
 has_yuv = SystemInfo['HAVEYUV']
 has_dvi = SystemInfo['HaveDVI']
@@ -794,16 +794,14 @@ def InitAVSwitch():
 	else:
 		detected = eAVSwitch.getInstance().haveScartSwitch()
 
-	SystemInfo["ScartSwitch"] = detected
-
-	if os.path.exists("/proc/stb/hdmi/bypass_edid_checking"):
-		f = open("/proc/stb/hdmi/bypass_edid_checking", "r")
-		can_edidchecking = f.read().strip().split(" ")
-		f.close()
-	else:
-		can_edidchecking = False
-
-	SystemInfo["Canedidchecking"] = can_edidchecking
+    SystemInfo['ScartSwitch'] = detected
+    if os.path.exists('/proc/stb/hdmi/bypass_edid_checking'):
+        f = open('/proc/stb/hdmi/bypass_edid_checking', 'r')
+        can_edidchecking = f.read().strip().split(' ')
+        f.close()
+    else:
+        can_edidchecking = False
+    SystemInfo['Canedidchecking'] = can_edidchecking
 
 	if can_edidchecking:
 		def setEDIDBypass(configElement):
