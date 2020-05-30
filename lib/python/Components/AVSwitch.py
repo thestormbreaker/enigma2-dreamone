@@ -804,22 +804,38 @@ def InitAVSwitch():
 		can_edidchecking = False
 
 	SystemInfo["Canedidchecking"] = can_edidchecking
+
+	if can_edidchecking:
 		def setEDIDBypass(configElement):
 			try:
 				f = open("/proc/stb/hdmi/bypass_edid_checking", "w")
-				f.write(configElement.value)
+				if configElement.value:
+					f.write("00000001")
+				else:
+					f.write("00000000")
 				f.close()
 			except:
 				pass
-		config.av.bypass_edid_checking = ConfigSelection(choices={
-				"00000000": _("off"),
-				"00000001": _("on")},
-				default = "00000000")
+		config.av.bypass_edid_checking = ConfigYesNo(default=True)
 		config.av.bypass_edid_checking.addNotifier(setEDIDBypass)
 	else:
 		config.av.bypass_edid_checking = ConfigNothing()
+		
+		
+	def setUnsupportModes(configElement):
+		iAVSwitch.readPreferredModes()
+		iAVSwitch.createConfig()
 
-	if SystemInfo["havecolorspace"]:
+	config.av.edid_override.addNotifier(setUnsupportModes)
+
+	if os.path.exists("/proc/stb/video/hdmi_colorspace"):
+		f = open("/proc/stb/video/hdmi_colorspace", "r")
+		have_colorspace = f.read().strip().split(" ")
+		f.close()
+	else:
+		have_colorspace = False
+
+	SystemInfo["havecolorspace"] = have_colorspace
 
 		if getBrandOEM() == "vuplus" and SystemInfo["HasMMC"]:
 			choices = [("Edid(Auto)", _("Auto")),
