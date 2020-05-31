@@ -794,13 +794,6 @@ def InitAVSwitch():
 	else:
 		detected = eAVSwitch.getInstance().haveScartSwitch()
 
-    SystemInfo['ScartSwitch'] = detected
-    if os.path.exists('/proc/stb/hdmi/bypass_edid_checking'):
-        f = open('/proc/stb/hdmi/bypass_edid_checking', 'r')
-        can_edidchecking = f.read().strip().split(' ')
-        f.close()
-    else:
-        can_edidchecking = False
     SystemInfo['Canedidchecking'] = can_edidchecking
 
 	if can_edidchecking:
