@@ -454,32 +454,6 @@ class PowerKey:
 		if not Screens.Standby.inStandby and self.session.current_dialog and self.session.current_dialog.ALLOW_SUSPEND and self.session.in_exec:
 			self.session.open(Screens.Standby.Standby)
 
-profile("Scart")
-from Screens.Scart import Scart
-
-class AutoScartControl:
-	def __init__(self, session):
-		self.force = False
-		self.current_vcr_sb = enigma.eAVSwitch.getInstance().getVCRSlowBlanking()
-		if self.current_vcr_sb and config.av.vcrswitch.value:
-			self.scartDialog = session.instantiateDialog(Scart, True)
-		else:
-			self.scartDialog = session.instantiateDialog(Scart, False)
-		config.av.vcrswitch.addNotifier(self.recheckVCRSb)
-		enigma.eAVSwitch.getInstance().vcr_sb_notifier.get().append(self.VCRSbChanged)
-
-	def recheckVCRSb(self, configelement):
-		self.VCRSbChanged(self.current_vcr_sb)
-
-	def VCRSbChanged(self, value):
-		#print "vcr sb changed to", value
-		self.current_vcr_sb = value
-		if config.av.vcrswitch.value or value > 2:
-			if value:
-				self.scartDialog.showMessageBox()
-			else:
-				self.scartDialog.switchToTV()
-
 profile("Load:CI")
 from Screens.Ci import CiHandler
 
@@ -531,9 +505,6 @@ def runScreenTest():
 	vol = VolumeControl(session)
 	profile("Init:PowerKey")
 	power = PowerKey(session)
-
-	# we need session.scart to access it from within menu.xml
-	session.scart = AutoScartControl(session)
 
 	profile("Init:Trashcan")
 	import Tools.Trashcan
