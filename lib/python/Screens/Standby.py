@@ -111,10 +111,6 @@ class Standby2(Screen):
 		if self.session.pipshown:
 			self.infoBarInstance and hasattr(self.infoBarInstance, "showPiP") and self.infoBarInstance.showPiP()
 
-		if SystemInfo["ScartSwitch"]:
-			self.avswitch.setInput("SCART")
-		else:
-			self.avswitch.setInput("AUX")
 		if getBrandOEM() in ('dinobot') or SystemInfo["HasHiSi"]:
 			try:
 				open("/proc/stb/hdmi/output", "w").write("off")
