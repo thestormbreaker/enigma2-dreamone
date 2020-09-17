@@ -11,10 +11,11 @@ config.av = ConfigSubsection()
 
 class AVSwitch:
 
-	has_rca = getHaveRCA() in ('True',)
-	has_dvi = getHaveDVI() in ('True',)
-	has_jack = getHaveAVJACK() in ('True',)
-	has_scart = getHaveSCART() in ('True',)
+	config.av = ConfigSubsection()
+	if getBrandOEM() in ('azbox',):
+		config.av.edid_override = ConfigYesNo(default = True)
+	else:
+		config.av.edid_override = ConfigYesNo(default = False)
 
 	print "SystemInfo", "MachineBuild", getMachineBuild()
 	print "SystemInfo", "BoxType", getBoxType()
@@ -28,14 +29,14 @@ class AVSwitch:
 	print "SystemInfo", "HaveSCARTYUV", getHaveSCARTYUV()
 	print "SystemInfo", "HaveHDMI", getHaveHDMI()
 	print "SystemInfo", "MachineMtdRoot", getMachineMtdRoot()
-	print "VideoWizard", "has_dvi", has_dvi
-	print "VideoWizard", "has_rca", has_rca
-	print "VideoWizard", "has_jack", has_jack
-	print "VideoWizard", "has_scart", has_scart
-	print "AVSwitch", "Scart-YPbPr", SystemInfo["Scart-YPbPr"]
-	print "AVSwitch", "no_YPbPr", SystemInfo["no_YPbPr"]
-	print "AVSwitch", "yellow_RCA_no_scart", SystemInfo["yellow_RCA_no_scart"]
-	print "AVSwitch", "no_yellow_RCA__no_scart", SystemInfo["no_yellow_RCA__no_scart"]
+#	print "VideoWizard", "has_dvi", has_dvi
+#	print "VideoWizard", "has_rca", has_rca
+#	print "VideoWizard", "has_jack", has_jack
+#	print "VideoWizard", "has_scart", has_scart
+#	print "AVSwitch", "Scart-YPbPr", SystemInfo["Scart-YPbPr"]
+#	print "AVSwitch", "no_YPbPr", SystemInfo["no_YPbPr"]
+#	print "AVSwitch", "yellow_RCA_no_scart", SystemInfo["yellow_RCA_no_scart"]
+#	print "AVSwitch", "no_yellow_RCA__no_scart", SystemInfo["no_yellow_RCA__no_scart"]
 
 	rates = { } # high-level, use selectable modes.
 	modes = { }  # a list of (high-level) modes for a certain port.
@@ -93,33 +94,46 @@ class AVSwitch:
 	modes["Scart"] = ["PAL", "NTSC", "Multi"]
 	# modes["DVI-PC"] = ["PC"]
 
-	modes["HDMI"] = SystemInfo["VideoModes"][0] 
-	widescreen_modes = SystemInfo["VideoModes"][1]
-
-	modes["YPbPr"] = modes["HDMI"]
-	
+	if (about.getChipSetString() in ('7366', '7376', '5272s', '7444', '7445', '7445s')):
+		modes["HDMI"] = ["720p", "1080p", "2160p", "1080i", "576p", "576i", "480p", "480i"]
+		widescreen_modes = {"720p", "1080p", "1080i", "2160p"}
+	elif (about.getChipSetString() in ('7252', '7251', '7251S', '7252S', '7251s', '7252s', '72604', '7278', '7444s', '3798mv200', '3798cv200', 'hi3798mv200', 'hi3798cv200')):
+		modes["HDMI"] = ["720p", "1080p", "2160p", "2160p30", "1080i", "576p", "576i", "480p", "480i"]
+		widescreen_modes = {"720p", "1080p", "1080i", "2160p", "2160p30"}
+	elif (about.getChipSetString() in ('7241', '7358', '7362', '73625', '7346', '7356', '73565', '7424', '7425', '7435', '7552', '7581', '7584', '75845', '7585', 'pnx8493', '7162', '7111', '3716mv410', 'hi3716mv410')) or (getBrandOEM() in ('azbox')):
+		modes["HDMI"] = ["720p", "1080p", "1080i", "576p", "576i", "480p", "480i"]
+		widescreen_modes = {"720p", "1080p", "1080i"}
+	elif about.getChipSetString() in ('meson-6',):
+		modes["HDMI"] = ["720p", "1080p", "1080i"]
+		widescreen_modes = {"720p", "1080p", "1080i"}
+	elif about.getChipSetString() in ('meson-64','S905D'):
+		modes["HDMI"] = ["720p", "1080p", "2160p", "2160p30", "1080i"]
+		widescreen_modes = {"720p", "1080p", "1080i", "2160p", "2160p30"}
+	else:
+		modes["HDMI"] = ["720p", "1080i", "576p", "576i", "480p", "480i"]
+		widescreen_modes = {"720p", "1080i"}
 	if getBoxType() in ('dreamone', 'dreamtwo'):
 		modes['HDMI'] = ["1080p", "720p", "2160p", "2160p30", "1080i"]
 		widescreen_modes = {"1080p", "720p", "1080i", "2160p", "2160p30"}
 		print "[AVSwitch] # dreamone/dreamtwo modes set!."	
 
-	if SystemInfo["Scart-YPbPr"]:
-		modes["Scart-YPbPr"] = modes["HDMI"]
+#	if SystemInfo["Scart-YPbPr"]:
+#		modes["Scart-YPbPr"] = modes["HDMI"]
 
 	# if "DVI-PC" in modes and not getModeList("DVI-PC"):
 	# 	print "[VideoHardware] remove DVI-PC because of not existing modes"
 	# 	del modes["DVI-PC"]
 
-	if "YPbPr" in modes and SystemInfo["no_YPbPr"]:
-		del modes["YPbPr"]
-
-	if "Scart" in modes and SystemInfo["yellow_RCA_no_scart"]:
-		modes["RCA"] = modes["Scart"]
-		del modes["Scart"]
-
-	if "Scart" in modes and SystemInfo["no_yellow_RCA__no_scart"]:
-		del modes["Scart"]
-
+#	if "YPbPr" in modes and SystemInfo["no_YPbPr"]:
+#		del modes["YPbPr"]
+#
+#	if "Scart" in modes and SystemInfo["yellow_RCA_no_scart"]:
+#		modes["RCA"] = modes["Scart"]
+#		del modes["Scart"]
+#
+#	if "Scart" in modes and SystemInfo["no_yellow_RCA__no_scart"]:
+#		del modes["Scart"]
+#
 	def __init__(self):
 		self.last_modes_preferred =  [ ]
 		self.on_hotplug = CList()
