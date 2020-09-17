@@ -207,7 +207,7 @@ class Navigation:
 			setResumePoint(MoviePlayer.instance.session)
 			MoviePlayerInstance.close()
 
-	def recordService(self, ref, simulate=False):
+	def recordService(self, ref, simulate=False, type=pNavigation.isUnknownRecording):
 		service = None
 		if isinstance(ref, ServiceReference.ServiceReference):
 			ref = ref.ref
