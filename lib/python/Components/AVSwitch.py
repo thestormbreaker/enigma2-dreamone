@@ -257,29 +257,28 @@ class AVSwitch:
 			except IOError:
 				print "[AVSwitch] setting videomode failed."
 
-		if SystemInfo["have24hz"]:
+#		if SystemInfo["have24hz"]:
+#			try:
+#				open("/proc/stb/video/videomode_24hz", "w").write(mode_24)
+#			except IOError:
+#				print "[VideoHardware] cannot open /proc/stb/video/videomode_24hz"
+
+		if getBrandOEM() in ('gigablue',):
 			try:
-				open("/proc/stb/video/videomode_24hz", "w").write(mode_24)
+				# use 50Hz mode (if available) for booting
+				f = open("/etc/videomode", "w")
+				f.write(mode_50)
+				f.close()
 			except IOError:
-				print "[VideoHardware] cannot open /proc/stb/video/videomode_24hz"
-			
-		if os.path.exists('/proc/stb/video/videomode_50hz') and getBoxType() not in (''):
-			f = open("/proc/stb/video/videomode_50hz", "w")
-			f.write(mode_50)
-			f.close()
-		if os.path.exists('/proc/stb/video/videomode_60hz') and getBoxType() not in (''):
-			f = open("/proc/stb/video/videomode_60hz", "w")
-			f.write(mode_60)
-			f.close()
-		try:
-			set_mode = modes.get(int(rate[:2]))
-		except: # not support 50Hz, 60Hz for 1080p
-			set_mode = mode_50
-		f = open("/proc/stb/video/videomode", "w")
-		f.write(set_mode)
-		f.close()
+				print "[AVSwitch] writing initial videomode to /etc/videomode failed."
+
 		map = {"cvbs": 0, "rgb": 1, "svideo": 2, "yuv": 3}
 		self.setColorFormat(map[config.av.colorformat.value])
+
+		if about.getCPUString().startswith('STx'):
+			#call setResolution() with -1,-1 to read the new scrren dimensions without changing the framebuffer resolution
+			from enigma import gMainDC
+			gMainDC.getInstance().setResolution(-1, -1)
 
 	def saveMode(self, port, mode, rate):
 		config.av.videoport.setValue(port)
@@ -328,7 +327,15 @@ class AVSwitch:
 		lst = []
 
 		config.av.videomode = ConfigSubDict()
+		config.av.autores_mode_sd = ConfigSubDict()
+		config.av.autores_mode_hd = ConfigSubDict()
+		config.av.autores_mode_fhd = ConfigSubDict()
+		config.av.autores_mode_uhd = ConfigSubDict()
 		config.av.videorate = ConfigSubDict()
+		config.av.autores_rate_sd = ConfigSubDict()
+		config.av.autores_rate_hd = ConfigSubDict()
+		config.av.autores_rate_fhd = ConfigSubDict()
+		config.av.autores_rate_uhd = ConfigSubDict()
 
 		# create list of output ports
 		portlist = self.getPortList()
@@ -342,8 +349,21 @@ class AVSwitch:
 			modes = self.getModeList(port)
 			if len(modes):
 				config.av.videomode[port] = ConfigSelection(choices = [mode for (mode, rates) in modes])
+				config.av.autores_mode_sd[port] = ConfigSelection(choices = [mode for (mode, rates) in modes])
+				config.av.autores_mode_hd[port] = ConfigSelection(choices = [mode for (mode, rates) in modes])
+				config.av.autores_mode_fhd[port] = ConfigSelection(choices = [mode for (mode, rates) in modes])
+				config.av.autores_mode_uhd[port] = ConfigSelection(choices = [mode for (mode, rates) in modes])
 			for (mode, rates) in modes:
-				config.av.videorate[mode] = ConfigSelection(choices = rates)
+				ratelist = []
+				for rate in rates:
+					if rate in ("auto"):
+						continue
+					ratelist.append((rate, rate))
+				config.av.videorate[mode] = ConfigSelection(choices = ratelist)
+				config.av.autores_rate_sd[mode] = ConfigSelection(choices = ratelist)
+				config.av.autores_rate_hd[mode] = ConfigSelection(choices = ratelist)
+				config.av.autores_rate_fhd[mode] = ConfigSelection(choices = ratelist)
+				config.av.autores_rate_uhd[mode] = ConfigSelection(choices = ratelist)
 		config.av.videoport = ConfigSelection(choices = lst)
 
 	def setInput(self, input):
