@@ -110,14 +110,19 @@ void eDVBVolumecontrol::closeMixer(int fd)
 #endif
 }
 
+void eDVBVolumecontrol::setVolumeSteps(int steps)
+{
+	m_volsteps = steps;
+}
+
 void eDVBVolumecontrol::volumeUp(int left, int right)
 {
-	setVolume(leftVol + left, rightVol + right);
+	setVolume(leftVol + (left ? left : m_volsteps), rightVol + (right ? right : m_volsteps));
 }
 
 void eDVBVolumecontrol::volumeDown(int left, int right)
 {
-	setVolume(leftVol - left, rightVol - right);
+	setVolume(leftVol - (left ? left : m_volsteps), rightVol - (right ? right : m_volsteps));
 }
 
 int eDVBVolumecontrol::checkVolume(int vol)
