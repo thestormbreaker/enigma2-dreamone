@@ -15,15 +15,18 @@ from os import access, R_OK, path as os_path
 from boxbranding import getBoxType, getBrandOEM
 
 def getFilePath(setting):
-	if getBrandOEM() in ('dreambox'):
+	if getBrandOEM() in ('dreambox',):
 		return "/proc/stb/vmpeg/0/dst_%s" % (setting)
 	else:
 		return "/proc/stb/fb/dst_%s" % (setting)
 
 def setPositionParameter(parameter, configElement):
-	f = open(getFilePath(parameter), "w")
-	f.write('%08X\n' % configElement.value)
-	f.close()
+	try:
+		f = open(getFilePath(parameter), "w")
+		f.write('%08X\n' % configElement.value)
+		f.close()
+	except:
+		pass
 	if fileExists(getFilePath("apply")):
 		f = open(getFilePath("apply"), "w")
 		f.write('1')
