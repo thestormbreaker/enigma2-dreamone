@@ -1148,4 +1148,29 @@ class MkfsTask(Task.LoggingTask):
 		self._reloadSystemdForData()
 
 harddiskmanager = HarddiskManager()
+
+
+SystemInfo["ext4"] = isFileSystemSupported("ext4")
+def isSleepStateDevice(device):	
+    ret = os.popen('hdparm -C %s' % device).read()	
+    if 'SG_IO' in ret or 'HDIO_DRIVE_CMD' in ret:	
+        return None	
+    elif 'drive state is:  standby' in ret or 'drive state is:  idle' in ret:	
+        return True	
+    elif 'drive state is:  active/idle' in ret:	
+        return False	
+    else:	
+        return None	
+
+
+def internalHDDNotSleeping(external = False):	
+    state = False	
+    if harddiskmanager.HDDCount():	
+        for hdd in harddiskmanager.HDDList():	
+            if hdd[1].internal or external:	
+                if hdd[1].idle_running and hdd[1].max_idle_time and not hdd[1].isSleeping():	
+                    state = True	
+
+    return state
+
 SystemInfo["ext4"] = isFileSystemSupported("ext4")
