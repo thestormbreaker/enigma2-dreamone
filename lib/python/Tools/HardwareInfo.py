@@ -1,77 +1,123 @@
-from boxbranding import getBoxType, getBrandOEM, getMachineName
-from Components.About import about
+from time import time, localtime, gmtime
+from os import path
+from fcntl import ioctl
+from struct import pack, unpack
+from Components.config import config
+from boxbranding import getBoxType, getBrandOEM
 
-class HardwareInfo:
-    device_name = None
-    device_version = None
+def getFPVersion():
+	ret = None
+	try:
+		if getBrandOEM() == "blackbox":
+			file = open("/proc/stb/info/micomver", "r")
+			ret = file.readline().strip()
+			file.close()
+		elif getBoxType() in ('dm7080','dm820','dm520','dm525','dm900','dm920'):
+			ret = open("/proc/stb/fp/version", "r").read()
+		else:	
+			ret = long(open("/proc/stb/fp/version", "r").read())
+	except IOError:
+		try:
+			fp = open("/dev/dbox/fp0")
+			ret = ioctl(fp.fileno(),0)
+		except IOError:
+			print "getFPVersion failed!"
+	return ret
 
-    def __init__(self):
-        if HardwareInfo.device_name is not None:
-            return
-        else:
-            HardwareInfo.device_name = 'unknown'
-            try:
-                file = open('/proc/stb/info/model', 'r')
-                HardwareInfo.device_name = file.readline().strip()
-                file.close()
-                if getBrandOEM() == 'dags':
-                    HardwareInfo.device_name = 'dm800se'
-                try:
-                    file = open('/proc/stb/info/version', 'r')
-                    HardwareInfo.device_version = file.readline().strip()
-                    file.close()
-                except:
-                    pass
+def setFPWakeuptime(wutime):
+	try:
+		f = open("/proc/stb/fp/wakeup_time", "w")
+		f.write(str(wutime))
+		f.close()
+	except IOError:
+		try:
+			fp = open("/dev/dbox/fp0")
+			ioctl(fp.fileno(), 6, pack('L', wutime)) # set wake up
+			fp.close()
+		except IOError:
+			print "setFPWakeupTime failed!"
 
-            except:
-                print '----------------'
-                print 'you should upgrade to new drivers for the hardware detection to work properly'
-                print '----------------'
-                print 'fallback to detect hardware via /proc/cpuinfo!!'
-                try:
-                    rd = open('/proc/cpuinfo', 'r').read()
-                    if 'Brcm4380 V4.2' in rd:
-                        HardwareInfo.device_name = 'dm8000'
-                        print 'dm8000 detected!'
-                    elif 'Brcm7401 V0.0' in rd:
-                        HardwareInfo.device_name = 'dm800'
-                        print 'dm800 detected!'
-                    elif 'MIPS 4KEc V4.8' in rd:
-                        HardwareInfo.device_name = 'dm7025'
-                        print 'dm7025 detected!'
-                except:
-                    pass
+def setRTCoffset():
+	forsleep = (localtime(time()).tm_hour-gmtime(time()).tm_hour)*3600
+	print "[RTC] set RTC offset to %s sec." % (forsleep)
+	try:
+		open("/proc/stb/fp/rtc_offset", "w").write(str(forsleep))
+	except IOError:
+		print "setRTCoffset failed!"
 
-            return
+def setRTCtime(wutime):
+        if path.exists("/proc/stb/fp/rtc_offset"):
+		setRTCoffset()
+	try:
+		f = open("/proc/stb/fp/rtc", "w")
+		f.write(str(wutime))
+		f.close()
+	except IOError:
+		try:
+			fp = open("/dev/dbox/fp0")
+			ioctl(fp.fileno(), 0x101, pack('L', wutime)) # set wake up
+			fp.close()
+		except IOError:
+			print "setRTCtime failed!"
 
-    def get_device_name(self):
-        return HardwareInfo.device_name
+def getFPWakeuptime():
+	ret = 0
+	try:
+		f = open("/proc/stb/fp/wakeup_time", "r")
+		ret = long(f.read())
+		f.close()
+	except IOError:
+		try:
+			fp = open("/dev/dbox/fp0")
+			ret = unpack('L', ioctl(fp.fileno(), 5, '    '))[0] # get wakeuptime
+			fp.close()
+		except IOError:
+			print "getFPWakeupTime failed!"
+	return ret
 
-    def get_device_version(self):
-        return HardwareInfo.device_version
+wasTimerWakeup = None
 
-    def get_device_model(self):
-        return getBoxType()
+def getFPWasTimerWakeup(check = False):
+	global wasTimerWakeup
+	isError = False
+	if wasTimerWakeup is not None:
+		if check:
+			return wasTimerWakeup, isError
+		return wasTimerWakeup
+	wasTimerWakeup = False
+	try:
+		f = open("/proc/stb/fp/was_timer_wakeup", "r")
+		file = f.read()
+		f.close()
+		wasTimerWakeup = int(file) and True or False
+		f = open("/tmp/was_timer_wakeup.txt", "w")
+		file = f.write(str(wasTimerWakeup))
+		f.close()
+	except:
+		try:
+			fp = open("/dev/dbox/fp0")
+			wasTimerWakeup = unpack('B', ioctl(fp.fileno(), 9, ' '))[0] and True or False
+			fp.close()
+		except IOError:
+			print "wasTimerWakeup failed!"
+			isError = True
 
-    def get_vu_device_name(self):
-        return getBoxType()
+	if wasTimerWakeup:
+		# clear hardware status
+		clearFPWasTimerWakeup()
+	if check:
+		return wasTimerWakeup, isError
+	return wasTimerWakeup
 
-    def get_friendly_name(self):
-        return getMachineName()
-
-    def has_hdmi(self):
-        return not (HardwareInfo.device_name == 'dm800' or HardwareInfo.device_name == 'dm8000' and HardwareInfo.device_version == None)
-
-    def linux_kernel(self):
-        try:
-            return open('/proc/version', 'r').read().split(' ', 4)[2].split('-', 2)[0]
-        except:
-            return 'unknown'
-
-    def has_deepstandby(self):
-        return getBoxType() != 'dm800'
-
-    def is_nextgen(self):
-        if about.getCPUString() in ('BCM7346B2', 'BCM7425B2', 'BCM7429B0'):
-            return True
-        return False
+def clearFPWasTimerWakeup():
+	try:
+		f = open("/proc/stb/fp/was_timer_wakeup", "w")
+		f.write('0')
+		f.close()
+	except:
+		try:
+			fp = open("/dev/dbox/fp0")
+			ioctl(fp.fileno(), 10)
+			fp.close()
+		except IOError:
+			print "clearFPWasTimerWakeup failed!"
