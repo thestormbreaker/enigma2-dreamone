@@ -65,3 +65,4 @@ autoreconf -i
 ./configure --prefix=$HOME/enigma2 --with-libsdl
 make
 make install
+

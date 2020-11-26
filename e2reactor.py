@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # enigma2 reactor: based on pollreactor, which is
 # Copyright (c) 2001-2004 Twisted Matrix Laboratories.
 # See LICENSE for details.
@@ -189,11 +190,20 @@ class PollReactor(posixbase.PosixReactorBase):
 				if not selectable.fileno() == fd:
 					why = error.ConnectionFdescWentAway('Filedescriptor went away')
 					inRead = False
+			except AttributeError, ae:
+				if "'NoneType' object has no attribute 'writeHeaders'" not in ae.message:
+					log.deferr()
+					why = sys.exc_info()[1]
+				else:
+					why = None
 			except:
 				log.deferr()
 				why = sys.exc_info()[1]
 		if why:
-			self._disconnectSelectable(selectable, why, inRead)
+			try:
+				self._disconnectSelectable(selectable, why, inRead)
+			except RuntimeError:
+				pass
 
 	def callLater(self, *args, **kwargs):
 		poller.eApp.interruptPoll()

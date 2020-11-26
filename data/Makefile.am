@@ -3,8 +3,10 @@ SUBDIRS = fonts keymaps
 dist_pkgdata_DATA = \
 	encoding.conf \
 	keymap.xml \
+	keytranslation.xml \
+	keymap.ntr \
+	keymap.u80 \
 	menu.xml \
-	menuorder.bh \
 	black.mvi \
 	rcpositions.xml \
 	setup.xml \
@@ -16,7 +18,6 @@ dist_pkgdata_DATA = \
 	freesat.t2 \
 	unicable.xml \
 	hd-testcard.mvi \
-	iso-639-3.pck \
 	distro-logo.png \
 	groupedservices \
 	otv_011a0000_0002_07d4.dict \
@@ -24,20 +25,25 @@ dist_pkgdata_DATA = \
 	otv_06180000_1000_0011.dict \
 	otv_06400000_00a9_0003.dict
 
+
+if HAVE_7SEGMENT
+SUBDIRS += 7segment
+endif
+
 if HAVE_TEXTLCD
+if SPARK
+SUBDIRS += displaydualtext
+else
 SUBDIRS += displaytext
 endif
-
-if HAVE_COLORLCD
-SUBDIRS += display96
-endif
-
-if HAVE_COLORLCD2
-SUBDIRS += display96
 endif
 
 if HAVE_COLORLCD3
 SUBDIRS += display128dm
+endif
+
+if HAVE_COLORLCD2
+SUBDIRS += display96
 endif
 
 if HAVE_COLORLCD1
@@ -54,10 +60,6 @@ endif
 
 if HAVE_COLORLCD400
 SUBDIRS += display400
-endif
-
-if HAVE_COLORLCD400DM
-SUBDIRS += display400dm
 endif
 
 if HAVE_COLORLCD480
@@ -84,5 +86,11 @@ if HAVE_BWLCD128
 SUBDIRS += vfd128
 endif
 
-iso-639-3.pck: $(srcdir)/iso-639-3.tab
-	python $(srcdir)/convert-iso-639-3.py $< $@
+if HAVE_GRAUTEC8000
+SUBDIRS += grautec8000
+endif
+
+if HAVE_GRAUTEC70X0
+SUBDIRS += grautec70x0
+endif
+

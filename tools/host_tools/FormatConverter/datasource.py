@@ -35,7 +35,7 @@ class datasource:
 		pass
 
 	def addSat(self, satname, satpos):
-		if satpos not in self.transponderlist:
+		if not self.transponderlist.has_key(satpos):
 			self.transponderlist[satpos] = []
 			self.satnames[satpos] = satname
 
