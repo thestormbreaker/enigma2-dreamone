@@ -1,8 +1,14 @@
 #include <lib/gui/elistbox.h>
 #include <lib/gui/elistboxcontent.h>
+#include <lib/gdi/epoint.h>
 #include <lib/gdi/font.h>
 #include <lib/python/python.h>
 #include <lib/gdi/epng.h>
+#include <lib/base/nconfig.h>
+#include <sstream>
+
+using namespace std;
+
 /*
     The basic idea is to have an interface which gives all relevant list
     processing functions, and can be used by the listbox to browse trough
@@ -214,7 +220,7 @@ void eListboxPythonStringContent::paint(gPainter &painter, eWindowStyle &style, 
 		if (selected && local_style && local_style->m_selection)
 			painter.blit(local_style->m_selection, ePoint(offset.x(), offset.y() + (m_itemsize.height() - local_style->m_selection->size().height()) / 2), eRect(), gPainter::BT_ALPHATEST);
 
-		if (item == Py_None)
+		if (!item || item == Py_None)
 		{
 				/* seperator */
 			int half_height = m_itemsize.height() / 2;
@@ -230,6 +236,9 @@ void eListboxPythonStringContent::paint(gPainter &painter, eWindowStyle &style, 
 			if (local_style)
 			{
 				text_offset += local_style->m_text_offset;
+//HACK VTI hat hier scheinbar einen Fehler und addiert den Textoffset zweimal auf, also machen wir das hier auch so
+				if (local_style->m_use_vti_workaround)
+					text_offset += local_style->m_text_offset;
 
 				if (local_style->m_valign == eListboxStyle::alignTop)
 					flags |= gPainter::RT_VALIGN_TOP;
@@ -247,7 +256,6 @@ void eListboxPythonStringContent::paint(gPainter &painter, eWindowStyle &style, 
 				else if (local_style->m_halign == eListboxStyle::alignBlock)
 					flags |= gPainter::RT_HALIGN_BLOCK;
 			}
-
 			painter.renderText(eRect(text_offset, m_itemsize),
 			 string, flags, border_color, border_size);
 		}
@@ -273,6 +281,13 @@ void eListboxPythonStringContent::setList(ePyObject list)
 
 	if (m_listbox)
 		m_listbox->entryReset(false);
+}
+
+void eListboxPythonStringContent::setItemHeight(int height)
+{
+	m_itemheight = height;
+	if (m_listbox)
+		m_listbox->setItemHeight(height);
 }
 
 PyObject *eListboxPythonStringContent::getCurrentSelection()
@@ -350,6 +365,7 @@ void eListboxPythonConfigContent::paint(gPainter &painter, eWindowStyle &style, 
 		}
 	}
 
+
 	if (!fnt)
 		fnt = new gFont("Regular", 20);
 	if (!fnt2)
@@ -426,7 +442,6 @@ void eListboxPythonConfigContent::paint(gPainter &painter, eWindowStyle &style, 
 					/* convert type to string */
 				ePyObject type = PyTuple_GET_ITEM(value, 0);
 				const char *atype = (type && PyString_Check(type)) ? PyString_AsString(type) : 0;
-
 				if (atype)
 				{
 					if (!strcmp(atype, "text"))
@@ -448,13 +463,20 @@ void eListboxPythonConfigContent::paint(gPainter &painter, eWindowStyle &style, 
 							/* convert value to Long. fallback to -1 on error. */
 						int value = (pvalue && PyInt_Check(pvalue)) ? PyInt_AsLong(pvalue) : -1;
 						int size = (pvalue && PyInt_Check(psize)) ? PyInt_AsLong(psize) : 100;
+						int value_area = 0;
 
+							/* draw value at the end of the slider */
+						if (eConfigManager::getConfigBoolValue("config.usage.show_slider_value", true))
+						{
+							value_area = 100;
+							painter.setFont(fnt2);
+							painter.renderText(eRect(ePoint(offset.x()-15, offset.y()), m_itemsize), std::to_string(value), gPainter::RT_HALIGN_RIGHT| gPainter::RT_VALIGN_CENTER, border_color, border_size);
+						}
 							/* calc. slider length */
-						int width = (m_itemsize.width() - m_seperation - 15) * value / size;
+						int width = (m_itemsize.width() - m_seperation - 15 - value_area) * value / size;
 						int height = m_itemsize.height();
 
-
-							/* draw slider */
+						/* draw slider */
 						//painter.fill(eRect(offset.x() + m_seperation, offset.y(), width, height));
 						if (m_slider_height % 2 != height % 2)
 							m_slider_height -= 1;
@@ -464,7 +486,7 @@ void eListboxPythonConfigContent::paint(gPainter &painter, eWindowStyle &style, 
 						if (m_slider_space)
 						{
 							ePoint tl(offset.x() + m_seperation, offset.y() + slider_y_offset - m_slider_space - 1);
-							ePoint tr(offset.x() + m_itemsize.width() - 15 - 1, tl.y());
+							ePoint tr(offset.x() + m_itemsize.width() - 15 - value_area - 1, tl.y());
 							ePoint bl(tl.x(), offset.y() + slider_y_offset + m_slider_height + m_slider_space);
 							ePoint br(tr.x(), bl.y());
 							painter.line(tl, tr);
@@ -527,7 +549,7 @@ void eListboxPythonConfigContent::paint(gPainter &painter, eWindowStyle &style, 
 								right = bbox.left() + bbox.width();
 								last = num;
 							}
-							/* entry is borrowed */
+							// entry is borrowed
 						}
 						if (last != -1) {
 							bbox = eRect(left, offset.y() + (m_itemsize.height() - pbox.height()) / 2, right - left, pbox.height());
@@ -560,7 +582,6 @@ void eListboxPythonConfigContent::paint(gPainter &painter, eWindowStyle &style, 
 						{
 							eRect rect(ePoint(m_itemsize.width() - pixmap->size().width() - 15, offset.y() + (m_itemsize.height() - pixmap->size().height()) / 2), pixmap->size());
 							painter.clip(rect);
-							/* painter.blit(pixmap, rect.topLeft(), rect, 0); */
 							painter.blit(pixmap, rect.topLeft(), rect, gPainter::BT_ALPHABLEND);
 							painter.clippop();
 						}
@@ -568,7 +589,7 @@ void eListboxPythonConfigContent::paint(gPainter &painter, eWindowStyle &style, 
 				}
 				/* type is borrowed */
 			} else if (value)
-				eWarning("[eListboxPythonConfigContent] second value of tuple is not a tuple.");
+				eWarning("eListboxPythonConfigContent: second value of tuple is not a tuple.");
 			if (value)
 				Py_DECREF(value);
 		}
@@ -727,6 +748,7 @@ static void clearRegion(gPainter &painter, eWindowStyle &style, eListboxStyle *l
 
 static ePyObject lookupColor(ePyObject color, ePyObject data)
 {
+//TODO check the logic, something is wrong in this function
 	if (color == Py_None)
 		return ePyObject();
 
@@ -896,7 +918,7 @@ void eListboxPythonMultiContent::paint(gPainter &painter, eWindowStyle &style, c
 				if (size > 12)
 				{
 					pborderWidth = PyTuple_GET_ITEM(item, 12);
-					if (pborderWidth == Py_None)
+					if (!pborderWidth || pborderWidth == Py_None)
 						pborderWidth=ePyObject();
 				}
 				if (size > 13)
@@ -906,7 +928,7 @@ void eListboxPythonMultiContent::paint(gPainter &painter, eWindowStyle &style, c
 					pstring = PyTuple_GetItem(data, PyInt_AsLong(pstring));
 
 							/* don't do anything if we have 'None' as string */
-				if (pstring == Py_None)
+				if (!pstring || pstring == Py_None)
 					continue;
 
 				const char *string = (PyString_Check(pstring)) ? PyString_AsString(pstring) : "<not-a-string>";
@@ -991,7 +1013,7 @@ void eListboxPythonMultiContent::paint(gPainter &painter, eWindowStyle &style, c
 				else
 				{
 					ppixmap = PyTuple_GET_ITEM(item, idx++);
-					if (ppixmap == Py_None)
+					if (!ppixmap || ppixmap == Py_None)
 						continue;
 					if (!(px && py && pwidth && pheight && pfilled_perc, ppixmap))
 					{
@@ -1003,31 +1025,31 @@ void eListboxPythonMultiContent::paint(gPainter &painter, eWindowStyle &style, c
 				if (size > idx)
 				{
 					pborderWidth = PyTuple_GET_ITEM(item, idx++);
-					if (pborderWidth == Py_None)
+					if (!pborderWidth || pborderWidth == Py_None)
 						pborderWidth = ePyObject();
 				}
 				if (size > idx)
 				{
 					pforeColor = PyTuple_GET_ITEM(item, idx++);
-					if (pforeColor == Py_None)
+					if (!pforeColor || pforeColor == Py_None)
 						pforeColor = ePyObject();
 				}
 				if (size > idx)
 				{
 					pforeColorSelected = PyTuple_GET_ITEM(item, idx++);
-					if (pforeColorSelected == Py_None)
+					if (!pforeColorSelected || pforeColorSelected == Py_None)
 						pforeColorSelected=ePyObject();
 				}
 				if (size > idx)
 				{
 					pbackColor = PyTuple_GET_ITEM(item, idx++);
-					if (pbackColor == Py_None)
+					if (!pbackColor || pbackColor == Py_None)
 						pbackColor=ePyObject();
 				}
 				if (size > idx)
 				{
 					pbackColorSelected = PyTuple_GET_ITEM(item, idx++);
-					if (pbackColorSelected == Py_None)
+					if (!pbackColorSelected || pbackColorSelected == Py_None)
 						pbackColorSelected=ePyObject();
 				}
 
@@ -1118,7 +1140,7 @@ void eListboxPythonMultiContent::paint(gPainter &painter, eWindowStyle &style, c
 					ppixmap = PyTuple_GetItem(data, PyInt_AsLong(ppixmap));
 
 							/* don't do anything if we have 'None' as pixmap */
-				if (ppixmap == Py_None)
+				if (!ppixmap || ppixmap == Py_None)
 					continue;
 
 				int x = PyInt_AsLong(px) + offset.x();
@@ -1248,11 +1270,6 @@ void eListboxPythonMultiContent::setList(ePyObject list)
 {
 	m_old_clip = m_clip = gRegion::invalidRegion();
 	eListboxPythonStringContent::setList(list);
-}
-
-void eListboxPythonMultiContent::resetClip()
-{
-	m_old_clip = m_clip = gRegion::invalidRegion();
 }
 
 void eListboxPythonMultiContent::updateClip(gRegion &clip)

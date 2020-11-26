@@ -94,7 +94,7 @@ void eRCInputEventDriver::keyPressed(int)
 	struct input_event ev;
 	while (1)
 	{
-		if (read(handle, &ev, sizeof(input_event))!=sizeof(input_event))
+		if (read(handle, &ev, sizeof(struct input_event))!=sizeof(struct input_event))
 			break;
 		if (enabled && !input->islocked())
 			for (std::list<eRCDevice*>::iterator i(listeners.begin()); i!=listeners.end(); ++i)
@@ -135,13 +135,12 @@ eRCInputEventDriver::eRCInputEventDriver(const char *filename): eRCDriver(eRCInp
 std::string eRCInputEventDriver::getDeviceName()
 {
 	char name[128]="";
-	if (handle >= 0) {
+	if (handle >= 0)
 		::ioctl(handle, EVIOCGNAME(128), name);
-		eDebug("[eRCInputEventDriver] devicename=%s", name);
-	}
 #ifdef FORCE_ADVANCED_REMOTE
 	if (!strcmp(name, "dreambox remote control (native)")) return "dreambox advanced remote control (native)";
 #endif
+	eDebug("[eRCInputEventDriver] devicename=%s", name);
 	return name;
 }
 

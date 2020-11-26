@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#include <ansidebug.h>
 
 
 DEFINE_REF(eDVBFrontendStatus);
@@ -113,12 +114,12 @@ int eDVBTransponderData::getInversion() const
 	return -1;
 }
 
-unsigned int eDVBTransponderData::getFrequency() const
+int eDVBTransponderData::getFrequency() const
 {
 	return 0;
 }
 
-unsigned int eDVBTransponderData::getSymbolRate() const
+int eDVBTransponderData::getSymbolRate() const
 {
 	return 0;
 }
@@ -153,11 +154,6 @@ int eDVBTransponderData::getPilot() const
 	return -1;
 }
 
-int eDVBTransponderData::getSystem() const
-{
-	return -1;
-}
-
 int eDVBTransponderData::getIsId() const
 {
 	return -1;
@@ -172,13 +168,22 @@ int eDVBTransponderData::getPLSCode() const
 {
 	return -1;
 }
-
 int eDVBTransponderData::getT2MIPlpId() const
 {
 	return -1;
 }
 
 int eDVBTransponderData::getT2MIPid() const
+{
+	return -1;
+}
+
+int eDVBTransponderData::getSystem() const
+{
+	return -1;
+}
+
+int eDVBTransponderData::getSystems() const
 {
 	return -1;
 }
@@ -225,8 +230,8 @@ int eDVBTransponderData::getPlpId() const
 
 DEFINE_REF(eDVBSatelliteTransponderData);
 
-eDVBSatelliteTransponderData::eDVBSatelliteTransponderData(struct dtv_property *dtvproperties, unsigned int propertycount, eDVBFrontendParametersSatellite &transponderparms, int frequencyoffset, bool original)
-: eDVBTransponderData(dtvproperties, propertycount, original), transponderParameters(transponderparms), frequencyOffset(frequencyoffset)
+eDVBSatelliteTransponderData::eDVBSatelliteTransponderData(struct dtv_property *dtvproperties, unsigned int propertycount, eDVBFrontendParametersSatellite &transponderparms, int frequencyoffset, long spectinvcnt, bool original)
+: eDVBTransponderData(dtvproperties, propertycount, original), transponderParameters(transponderparms), frequencyOffset(frequencyoffset), spectinvCnt(spectinvcnt)
 {
 }
 
@@ -248,14 +253,15 @@ int eDVBSatelliteTransponderData::getInversion() const
 	}
 }
 
-unsigned int eDVBSatelliteTransponderData::getFrequency() const
+
+int eDVBSatelliteTransponderData::getFrequency() const
 {
 	if (originalValues) return transponderParameters.frequency;
 
-	return getProperty(DTV_FREQUENCY) + frequencyOffset;
+	return roundMulti((spectinvCnt&1) ? frequencyOffset - getProperty(DTV_FREQUENCY) : frequencyOffset + getProperty(DTV_FREQUENCY), 1000);
 }
 
-unsigned int eDVBSatelliteTransponderData::getSymbolRate() const
+int eDVBSatelliteTransponderData::getSymbolRate() const
 {
 	if (originalValues) return transponderParameters.symbol_rate;
 
@@ -347,6 +353,11 @@ int eDVBSatelliteTransponderData::getSystem() const
 	}
 }
 
+int eDVBSatelliteTransponderData::getSystems() const
+{
+	return -1;
+}
+
 int eDVBSatelliteTransponderData::getIsId() const
 {
 	if (originalValues) return transponderParameters.is_id;
@@ -379,7 +390,6 @@ int eDVBSatelliteTransponderData::getPLSCode() const
 	if (stream_id == NO_STREAM_ID_FILTER) return transponderParameters.pls_code;
 	return (stream_id >> 8) & 0x3FFFF;
 }
-
 int eDVBSatelliteTransponderData::getT2MIPlpId() const
 {
 	if (originalValues) return transponderParameters.t2mi_plp_id;
@@ -427,14 +437,14 @@ int eDVBCableTransponderData::getInversion() const
 	}
 }
 
-unsigned int eDVBCableTransponderData::getFrequency() const
+int eDVBCableTransponderData::getFrequency() const
 {
 	if (originalValues) return transponderParameters.frequency;
 
 	return getProperty(DTV_FREQUENCY) / 1000;
 }
 
-unsigned int eDVBCableTransponderData::getSymbolRate() const
+int eDVBCableTransponderData::getSymbolRate() const
 {
 	if (originalValues) return transponderParameters.symbol_rate;
 
@@ -494,6 +504,11 @@ int eDVBCableTransponderData::getSystem() const
 #endif
 }
 
+int eDVBCableTransponderData::getSystems() const
+{
+	return -1;
+}
+
 DEFINE_REF(eDVBTerrestrialTransponderData);
 
 eDVBTerrestrialTransponderData::eDVBTerrestrialTransponderData(struct dtv_property *dtvproperties, unsigned int propertycount, eDVBFrontendParametersTerrestrial &transponderparms, bool original)
@@ -519,10 +534,12 @@ int eDVBTerrestrialTransponderData::getInversion() const
 	}
 }
 
-unsigned int eDVBTerrestrialTransponderData::getFrequency() const
+int eDVBTerrestrialTransponderData::getFrequency() const
 {
-	if (originalValues) return transponderParameters.frequency;
-
+	if (originalValues)
+	{
+		return transponderParameters.frequency;
+	}
 	return getProperty(DTV_FREQUENCY);
 }
 
@@ -666,6 +683,11 @@ int eDVBTerrestrialTransponderData::getSystem() const
 	}
 }
 
+int eDVBTerrestrialTransponderData::getSystems() const
+{
+	return -1;
+}
+
 DEFINE_REF(eDVBATSCTransponderData);
 
 eDVBATSCTransponderData::eDVBATSCTransponderData(struct dtv_property *dtvproperties, unsigned int propertycount, eDVBFrontendParametersATSC &transponderparms, bool original)
@@ -691,7 +713,7 @@ int eDVBATSCTransponderData::getInversion() const
 	}
 }
 
-unsigned int eDVBATSCTransponderData::getFrequency() const
+int eDVBATSCTransponderData::getFrequency() const
 {
 	if (originalValues) return transponderParameters.frequency;
 
@@ -726,6 +748,11 @@ int eDVBATSCTransponderData::getSystem() const
 	case SYS_ATSC: return eDVBFrontendParametersATSC::System_ATSC;
 	case SYS_DVBC_ANNEX_B: return eDVBFrontendParametersATSC::System_DVB_C_ANNEX_B;
 	}
+}
+
+int eDVBATSCTransponderData::getSystems() const
+{
+	return -1;
 }
 
 DEFINE_REF(eDVBFrontendData);

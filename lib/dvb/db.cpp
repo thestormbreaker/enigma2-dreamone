@@ -157,6 +157,16 @@ RESULT eBouquet::setListName(const std::string &name)
 	return 0;
 }
 
+const eDVBService::cacheID eDVBService::audioCacheTags[] = {
+	eDVBService::cMPEGAPID, eDVBService::cAC3PID,
+	eDVBService::cAACHEAPID, eDVBService::cDDPPID,
+	eDVBService::cDTSPID, eDVBService::cAACAPID,
+	eDVBService::cLPCMPID, eDVBService::cDTSHDPID,
+};
+
+const int eDVBService::nAudioCacheTags = sizeof(eDVBService::audioCacheTags) / sizeof(eDVBService::audioCacheTags[0]);
+
+
 eDVBService::eDVBService()
 	:m_cache(0), m_flags(0)
 {
@@ -236,6 +246,7 @@ int eDVBService::isPlayable(const eServiceReference &ref, const eServiceReferenc
 
 		if (res_mgr->canAllocateChannel(chid, chid_ignore, system, simulate))
 		{
+			std::string python_config_str;
 			bool use_ci_assignment = eConfigManager::getConfigBoolValue("config.misc.use_ci_assignment", false);
 			if (use_ci_assignment)
 			{
@@ -366,6 +377,15 @@ bool eDVBService::cacheEmpty()
 	return true;
 }
 
+bool eDVBService::cacheAudioEmpty()
+{
+	if (m_cache)
+		for (int i=0; i < nAudioCacheTags; ++i)
+			if (m_cache[audioCacheTags[i]] != -1)
+				return false;
+	return true;
+}
+
 void eDVBService::initCache()
 {
 	m_cache = new int[cacheMax];
@@ -432,7 +452,7 @@ void eDVBDB::parseServiceData(ePtr<eDVBService> s, std::string str)
 		else if (p == 'f')
 		{
 			sscanf(v.c_str(), "%x", &s->m_flags);
-			s->m_flags &= ~eDVBService::dxDontshow;
+			s->m_flags &= ~eDVBService::dxIsParentalProtected;
 		} else if (p == 'c')
 		{
 			int cid, val;
@@ -677,7 +697,7 @@ void eDVBDB::loadServiceListV5(FILE * f)
 			scount++;
 		}
 	}
-	eDebug("[eDVBDB] loaded %d channels/transponders and %d services", tcount, scount);
+	eDebug("loaded %d channels/transponders and %d services", tcount, scount);
 }
 
 void eDVBDB::loadServicelist(const char *file)
@@ -839,11 +859,15 @@ void eDVBDB::saveServicelist(const char *file)
 					if (g)
 						fprintf(g, ",MIS/PLS:%d:%d:%d", sat.is_id, sat.pls_code & 0x3FFFF, sat.pls_mode & 3);
 				}
-				// Old lamedb format cannot have multiple optional values so we must pad lamedb with default multistream 
-				// values if they will be followed by t2mi values. In lamedb5 format this is not necessary.
 				else if (static_cast<unsigned int>(sat.t2mi_plp_id) != eDVBFrontendParametersSatellite::No_T2MI_PLP_Id)
 				{
-					fprintf(f, ":%d:%d:%d", eDVBFrontendParametersSatellite::No_Stream_Id_Filter, eDVBFrontendParametersSatellite::PLS_Default_Gold_Code, eDVBFrontendParametersSatellite::PLS_Gold);
+					/*
+					 * Old lamedb format cannot have multiple optional values
+					 * so we must pad lamedb with default multistream values
+					 * otherwise the t2mi values will be stored on mulistream ones
+					 */
+					fprintf(f, ":%d:%d:%d", eDVBFrontendParametersSatellite::No_Stream_Id_Filter,
+						eDVBFrontendParametersSatellite::PLS_Default_Gold_Code, eDVBFrontendParametersSatellite::PLS_Gold);
 				}
 
 				if (static_cast<unsigned int>(sat.t2mi_plp_id) != eDVBFrontendParametersSatellite::No_T2MI_PLP_Id)
@@ -1203,7 +1227,7 @@ void eDVBDB::reloadBouquets()
 	loadBouquet("bouquets.tv");
 	loadBouquet("bouquets.radio");
 	// create default bouquets when missing
-	if ( m_bouquets["bouquets.tv"].m_services.empty() )
+	if ( m_bouquets.find("userbouquet.favourites.tv") == m_bouquets.end() )
 	{
 		eBouquet &b = m_bouquets["userbouquet.favourites.tv"];
 		b.m_filename = "userbouquet.favourites.tv";
@@ -1218,7 +1242,7 @@ void eDVBDB::reloadBouquets()
 		parent.m_services.push_back(ref);
 		parent.flushChanges();
 	}
-	if ( m_bouquets["bouquets.radio"].m_services.empty() )
+	if ( m_bouquets.find("userbouquet.favourites.radio") == m_bouquets.end() )
 	{
 		eBouquet &b = m_bouquets["userbouquet.favourites.radio"];
 		b.m_filename = "userbouquet.favourites.radio";
@@ -2362,6 +2386,22 @@ RESULT eDVBDB::startQuery(ePtr<iDVBChannelListQuery> &query, eDVBChannelQuery *q
 	else
 		query = new eDVBDBQuery(this, source, q);
 	return 0;
+}
+
+bool eDVBDB::isValidService(int tsid, int onid, int sid)
+{
+	eServiceID Sid(sid);
+	eTransportStreamID Tsid(tsid);
+	eOriginalNetworkID Onid(onid);
+	for (std::map<eServiceReferenceDVB, ePtr<eDVBService> >::iterator sit(m_services.begin());
+		sit != m_services.end(); ++sit)
+	{
+		if (sit->first.getTransportStreamID() == Tsid &&
+			sit->first.getOriginalNetworkID() == Onid &&
+			sit->first.getServiceID() == Sid)
+			return true;
+	}
+	return false;
 }
 
 eServiceReference eDVBDB::searchReference(int tsid, int onid, int sid)

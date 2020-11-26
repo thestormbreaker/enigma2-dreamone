@@ -577,3 +577,4 @@ void fbClass::setFBdiff(int top, int left, int right, int bottom)
 	bottomDiff = bottom;
 }
 #endif
+

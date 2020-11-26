@@ -21,7 +21,7 @@ class eServiceFactoryDVB: public iServiceHandler
 public:
 	eServiceFactoryDVB();
 	virtual ~eServiceFactoryDVB();
-	enum { id = 0x1 };
+	enum { id = eServiceReference::idDVB };
 
 		// iServiceHandler
 	RESULT play(const eServiceReference &, ePtr<iPlayableService> &ptr);
@@ -113,7 +113,7 @@ public:
 	RESULT subtitle(ePtr<iSubtitleOutput> &ptr);
 	RESULT audioDelay(ePtr<iAudioDelay> &ptr);
 	RESULT rdsDecoder(ePtr<iRdsDecoder> &ptr);
-	RESULT keys(ePtr<iServiceKeys> &ptr) { ptr = nullptr; return -1; }
+	RESULT keys(ePtr<iServiceKeys> &ptr) { ptr = 0; return -1; }
 
 		// iStreamedService
 	RESULT streamed(ePtr<iStreamedService> &ptr);
@@ -142,6 +142,7 @@ public:
 	std::string getInfoString(int w);
 	ePtr<iDVBTransponderData> getTransponderData();
 	void getAITApplications(std::map<int, std::string> &aitlist);
+	PyObject * getHbbTVApplications();
 	void getCaIds(std::vector<int> &caids, std::vector<int> &ecmpids, std::vector<std::string> &ecmdatabytes);
 
 		// iAudioTrackSelection
@@ -195,6 +196,7 @@ public:
 		// iStreamableService
 	RESULT stream(ePtr<iStreamableService> &ptr);
 	ePtr<iStreamData> getStreamingData();
+
 	void setQpipMode(bool value, bool audio);
 
 protected:

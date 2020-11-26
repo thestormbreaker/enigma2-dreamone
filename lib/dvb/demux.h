@@ -24,7 +24,7 @@ public:
 
 	RESULT createSectionReader(eMainloop *context, ePtr<iDVBSectionReader> &reader);
 	RESULT createPESReader(eMainloop *context, ePtr<iDVBPESReader> &reader);
-	RESULT createTSRecorder(ePtr<iDVBTSRecorder> &recorder, int packetsize = 188, bool streaming=false);
+	RESULT createTSRecorder(ePtr<iDVBTSRecorder> &recorder, unsigned int packetsize = 188, bool streaming=false);
 	RESULT getMPEGDecoder(ePtr<iTSMPEGDecoder> &reader, int index);
 	RESULT getSTC(pts_t &pts, int num);
 	RESULT getCADemuxID(uint8_t &id) { id = demux; return 0; }
@@ -49,6 +49,10 @@ private:
 	friend class eDVBTSRecorder;
 	friend class eDVBCAService;
 	friend class eTSMPEGDecoder;
+#ifdef HAVE_AMLOGIC
+	int m_pvr_fd;
+	friend class eAMLTSMPEGDecoder;
+#endif
 	sigc::signal1<void, int> m_event;
 
 	int openDemux(void);
@@ -64,11 +68,14 @@ class eDVBSectionReader: public iDVBSectionReader, public sigc::trackable
 	int checkcrc;
 	void data(int);
 	ePtr<eSocketNotifier> notifier;
+	Slot0<__u8*> m_buffer_func;
+	bool m_have_external_buffer_func;
 public:
 	eDVBSectionReader(eDVBDemux *demux, eMainloop *context, RESULT &res);
 	virtual ~eDVBSectionReader();
 	RESULT setBufferSize(int size);
 	RESULT start(const eDVBSectionFilterMask &mask);
+	RESULT startWithExternalBufferFunc(const eDVBSectionFilterMask &mask, const Slot0<__u8*> &buffer_func);
 	RESULT stop();
 	RESULT connectRead(const sigc::slot1<void,const uint8_t*> &read, ePtr<eConnection> &conn);
 };
@@ -114,7 +121,7 @@ protected:
 		unsigned char* buffer;
 		AsyncIO()
 		{
-			memset(&aio, 0, sizeof(aiocb));
+			memset(&aio, 0, sizeof(struct aiocb));
 			buffer = NULL;
 		}
 		int wait();
@@ -136,6 +143,7 @@ class eDVBRecordStreamThread: public eDVBRecordFileThread
 {
 public:
 	eDVBRecordStreamThread(int packetsize);
+
 protected:
 	int writeData(int len);
 	void flush();
@@ -170,6 +178,7 @@ private:
 	RESULT startPID(int pid);
 	void stopPID(int pid);
 
+
 	void filepushEvent(int event);
 
 	std::map<int,int> m_pids;
@@ -183,6 +192,7 @@ private:
 	eDVBRecordFileThread *m_thread;
 	std::string m_target_filename;
 	int m_packetsize;
+	friend class eRTSPStreamClient;
 };
 
 #endif

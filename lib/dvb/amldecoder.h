@@ -23,13 +23,9 @@
 
 #include <lib/base/object.h>
 #include <lib/dvb/demux.h>
-#include <lib/dvb/decoder.h>
 // Amlogic includes
 extern "C" {
 #include <codec.h>
-#include <adec-external-ctrl.h>
-#define AMSTREAM_IOC_MAGIC  'S'
-#define AMSTREAM_IOC_PCRID  _IOW(AMSTREAM_IOC_MAGIC, 0x4f, int)
 }
 
 class eSocketNotifier;
@@ -44,11 +40,8 @@ private:
 	static int m_audio_channel;
 	std::string m_radio_pic;
 	ePtr<eDVBDemux> m_demux;
-	ePtr<eDVBTText> m_text;
 	int m_vpid, m_vtype, m_apid, m_atype, m_pcrpid, m_textpid;
 	int m_width, m_height, m_framerate, m_aspect, m_progressive;
-	int aml_fd;
-	int cntl_fd;
 	enum
 	{
 		changeVideo = 1,
@@ -75,18 +68,9 @@ private:
 	void finishShowSinglePic(); // called by timer
 	ePtr<eTimer> m_VideoRead;	
 	void parseVideoInfo(); // called by timer
-	
+
 	//Amcodec related
-
-	int m_axis[8];
-
-	int osdBlank(int cmd);
-	int setAvsyncEnable(int enable);
-	int setSyncMode(int mode);
 	codec_para_t m_codec;
-	dec_sysinfo_t am_sysinfo;
-	arm_audio_info am_param;
-	void *adec_handle;
 
 public:
 	enum { aMPEG, aAC3, aDTS, aAAC, aAACHE, aLPCM, aDTSHD, aDDP,UNKNOWN = -1, MPEG2=0, MPEG4_H264, VC1 = 3, MPEG4_Part2, VC1_SM, MPEG1, H265_HEVC, AVS = 16 };

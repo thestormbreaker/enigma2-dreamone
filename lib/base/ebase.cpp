@@ -173,6 +173,7 @@ void eMainloop::removeSocketNotifier(eSocketNotifier *sn)
 int eMainloop::processOneEvent(long user_timeout, PyObject **res, ePyObject additional)
 {
 	int return_reason = 0;
+		/* get current time */
 
 	if (additional && !PyDict_Check(additional))
 		eFatal("[eMainloop::processOneEvent] additional, but it's not dict");
@@ -187,7 +188,6 @@ int eMainloop::processOneEvent(long user_timeout, PyObject **res, ePyObject addi
 		if (it != m_timer_list.end())
 		{
 			eTimer *tmr = *it;
-			/* get current time */
 			timespec now;
 			clock_gettime(CLOCK_MONOTONIC, &now);
 			/* process all timers which are ready. first remove them out of the list. */

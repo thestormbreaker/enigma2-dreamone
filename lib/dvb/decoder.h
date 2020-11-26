@@ -12,8 +12,18 @@ class eDVBAudio: public iObject
 private:
 	ePtr<eDVBDemux> m_demux;
 	int m_fd, m_fd_demux, m_dev, m_is_freezed;
+	void  *lib_handle;
+	int  (*__AudioCodec_init)(int , int);
+	int  (*__AudioCodec_startPid)(int , int, int);
+	void (*__AudioCodec_stop)(void);	
+	void (*__AudioCodec_flush)(void);	
+	void (*__AudioCodec_freeze)(void);	
+	void (*__AudioCodec_unfreeze)(void);	
+	void (*__AudioCodec_setChannel)(int);
+	int  (*__AudioCodec_getPTS)(__u64 *);
+	void (*__AudioCodec_destroy)(void);
 public:
-	enum { aMPEG, aAC3, aDTS, aAAC, aAACHE, aLPCM, aDTSHD, aDDP, aDRA, aAC4 };
+	enum { aMPEG, aAC3, aDTS, aAAC, aAACHE, aLPCM, aDTSHD, aDDP, aDRA, aAC4, aPCM };
 	eDVBAudio(eDVBDemux *demux, int dev);
 	enum { aMonoLeft, aStereo, aMonoRight };
 	void setChannel(int channel);
@@ -24,6 +34,7 @@ public:
 	void unfreeze();
 	int getPTS(pts_t &now);
 	virtual ~eDVBAudio();
+	void setSTCValidState(int state);
 };
 
 class eDVBVideo: public iObject, public sigc::trackable
@@ -36,6 +47,11 @@ private:
 	int m_is_slow_motion, m_is_fast_forward, m_is_freezed;
 	ePtr<eSocketNotifier> m_sn;
 	void video_event(int what);
+#if defined(__aarch64__)
+	int m_fd_amvideoPoll;
+	ePtr<eSocketNotifier> m_sn_amvideoPoll;
+	void amvideo_event(int);
+#endif	
 	sigc::signal1<void, struct iTSMPEGDecoder::videoEvent> m_event;
 	int m_width, m_height, m_framerate, m_aspect, m_progressive, m_gamma;
 	static int readApiSize(int fd, int &xres, int &yres, int &aspect);
@@ -70,6 +86,7 @@ public:
 	eDVBPCR(eDVBDemux *demux, int dev);
 	int startPid(int pid);
 	void stop();
+	void restart();
 	virtual ~eDVBPCR();
 };
 
@@ -119,6 +136,7 @@ private:
 	void demux_event(int event);
 	void video_event(struct videoEvent);
 	sigc::signal1<void, struct videoEvent> m_video_event;
+	sigc::signal1<void, int> m_state_event;
 	int m_video_clip_fd;
 	ePtr<eTimer> m_showSinglePicTimer;
 	void finishShowSinglePic(); // called by timer
@@ -169,12 +187,16 @@ public:
 		/* what 0=auto, 1=video, 2=audio. */
 	RESULT getPTS(int what, pts_t &pts);
 	RESULT connectVideoEvent(const sigc::slot1<void, struct videoEvent> &event, ePtr<eConnection> &connection);
+	RESULT connectStateEvent(const sigc::slot1<void, int> &event, ePtr<eConnection> &connection);
+	int getVideoDecoderId();
 	int getVideoWidth();
 	int getVideoHeight();
 	int getVideoProgressive();
 	int getVideoFrameRate();
 	int getVideoAspect();
 	int getVideoGamma();
+	int getState();
+	const char* getEotf();
 	static RESULT setHwPCMDelay(int delay);
 	static RESULT setHwAC3Delay(int delay);
 };

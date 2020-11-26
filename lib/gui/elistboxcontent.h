@@ -12,6 +12,7 @@ public:
 	~eListboxPythonStringContent();
 
 	void setList(SWIG_PYOBJECT(ePyObject) list);
+	void setItemHeight(int height);
 	PyObject *getCurrentSelection();
 	int getCurrentSelectionIndex() { return m_cursor; }
 	void invalidateEntry(int index);
@@ -81,7 +82,6 @@ public:
 	void setItemHeight(int height);
 	void setSelectionClip(eRect &rect, bool update=false);
 	void updateClip(gRegion &);
-	void resetClip();
 	void entryRemoved(int idx);
 	void setTemplate(SWIG_PYOBJECT(ePyObject) tmplate);
 private:
@@ -110,7 +110,6 @@ private:
 #define BT_VALIGN_CENTER 64
 #define BT_VALIGN_BOTTOM 128
 #define BT_ALIGN_CENTER BT_HALIGN_CENTER | BT_VALIGN_CENTER
-
 #endif // SWIG
 
 #endif

@@ -35,10 +35,7 @@ eBackgroundFileEraser::~eBackgroundFileEraser()
 	messages.send(Message());
 	if (instance==this)
 		instance=0;
-	// Wait for the thread to complete. Must do that here,
-	// because in C++ the object will be demoted after this
-	// returns.
-	kill();
+	kill();  // i dont understand why this is needed .. in ~eThread::eThread is a kill() to..
 }
 
 void eBackgroundFileEraser::thread()
@@ -86,7 +83,10 @@ void eBackgroundFileEraser::gotMessage(const Message &msg )
 	}
 	else
 	{
-		const char* c_filename = msg.filename.c_str();
+		std::vector<char> v_filename(msg.filename.begin(), msg.filename.end());
+		v_filename.push_back('\0');
+		const char* c_filename = &v_filename[0];
+
 		bool unlinked = false;
 		eDebug("[eBackgroundFileEraser] deleting '%s'", c_filename);
 		if ((((erase_flags & ERASE_FLAG_HDD) != 0) && (strncmp(c_filename, "/media/hdd/", 11) == 0)) ||
@@ -110,10 +110,7 @@ void eBackgroundFileEraser::gotMessage(const Message &msg )
 						if (::unlink(c_filename) == 0)
 							unlinked = true;
 						st.st_size -= st.st_size % erase_speed; // align on erase_speed
-						if (::ftruncate(fd, st.st_size) != 0)
-						{
-							eDebug("[eBackgroundFileEraser] Failed to truncate %s: %m", c_filename);
-						}
+						::ftruncate(fd, st.st_size);
 						usleep(500000); // even if truncate fails, wait a moment
 						while ((st.st_size > erase_speed) && (erase_flags != 0))
 						{

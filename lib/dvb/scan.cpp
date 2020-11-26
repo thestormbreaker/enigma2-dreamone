@@ -6,6 +6,7 @@
 #include <dvbsi++/s2_satellite_delivery_system_descriptor.h>
 #include <dvbsi++/terrestrial_delivery_system_descriptor.h>
 #include <dvbsi++/t2_delivery_system_descriptor.h>
+#include <dvbsi++/logical_channel_descriptor.h>
 #include <dvbsi++/cable_delivery_system_descriptor.h>
 #include <dvbsi++/ca_identifier_descriptor.h>
 #include <dvbsi++/registration_descriptor.h>
@@ -23,12 +24,14 @@
 #include <lib/base/estring.h>
 #include <lib/dvb/dvb.h>
 #include <lib/dvb/db.h>
+#include <lib/python/python.h>
 #include <errno.h>
 #include "absdiff.h"
 
 #define SCAN_eDebug(x...) do { if (m_scan_debug) eDebug(x); } while(0)
 #define SCAN_eDebugNoNewLineStart(x...) do { if (m_scan_debug) eDebugNoNewLineStart(x); } while(0)
 #define SCAN_eDebugNoNewLine(x...) do { if (m_scan_debug) eDebugNoNewLine(x); } while(0)
+#define SCAN_eDebugNoNewLineEnd(x...) do { if (m_scan_debug) eDebugNoNewLineEnd(x); } while(0)
 
 DEFINE_REF(eDVBScan);
 
@@ -44,12 +47,15 @@ eDVBScan::eDVBScan(iDVBChannel *channel, bool usePAT, bool debug)
 	,m_scan_debug(debug)
 {
 	if (m_channel->getDemux(m_demux))
-		SCAN_eDebug("[eDVBScan] failed to allocate demux!");
+		SCAN_eDebug("scan: failed to allocate demux!");
 	m_channel->connectStateChange(sigc::mem_fun(*this, &eDVBScan::stateChange), m_stateChanged_connection);
+	m_lcn_file = NULL;
 }
 
 eDVBScan::~eDVBScan()
 {
+	if (m_lcn_file)
+		fclose(m_lcn_file);
 }
 
 int eDVBScan::isValidONIDTSID(int orbital_position, eOriginalNetworkID onid, eTransportStreamID tsid)
@@ -105,8 +111,8 @@ int eDVBScan::isValidONIDTSID(int orbital_position, eOriginalNetworkID onid, eTr
 	case 32: // NSS 806 (40.5W) 4059R, 3774L
 		ret = orbital_position != 3195 || tsid != 21;
 		break;
-	case 126:  // 11221H and 11387H on Utelsat 7.0E with same ONID/TSID (126/40700)
-		ret = orbital_position != 70 || (tsid != 40700 && tsid != 30300);
+	case 126:  // 11221H and 11387H on Utelsat 7.0E with same ONID/TSID (126/40700) and 11304H, 11262H (126/30300) 
+		ret = orbital_position != 70 || (tsid != 40700 && tsid !=30300);
 		break;
 	case 3622:  // 11881H and 12284V on Badr 26.0E with same ONID/TSID (3622/100)
 		ret = orbital_position != 260 || tsid != 100;
@@ -636,6 +642,40 @@ void eDVBScan::addKnownGoodChannel(const eDVBChannelID &chid, iDVBFrontendParame
 		m_new_channels.insert(std::pair<eDVBChannelID,ePtr<iDVBFrontendParameters> >(chid, feparm));
 }
 
+void eDVBScan::addLcnToDB(eDVBNamespace ns, eOriginalNetworkID onid, eTransportStreamID tsid, eServiceID sid, uint16_t lcn, uint32_t signal)
+{
+	if (m_lcn_file)
+	{
+		int size = 0;
+		char row[40];
+		bool added = false;
+		sprintf(row, "%08x:%04x:%04x:%04x:%05d:%08d\n", ns.get(), onid.get(), tsid.get(), sid.get(), lcn, signal);
+		fseek(m_lcn_file, 0, SEEK_END);
+		size = ftell(m_lcn_file);
+		
+		for (int i = 0; i < size / 39; i++)
+		{
+			char tmp[40];
+			fseek(m_lcn_file, i*39, SEEK_SET);
+			fread (tmp, 1, 39, m_lcn_file);
+			if (memcmp(tmp, row, 23) == 0)
+			{
+				fseek(m_lcn_file, i*39, SEEK_SET);
+				fwrite(row, 1, 39, m_lcn_file);
+				added = true;
+				break;
+			}
+		}
+			
+		if (!added)
+		{
+			fseek(m_lcn_file, 0, SEEK_END);
+			fwrite(row, 1, 39, m_lcn_file);
+		}
+	}
+}
+
+
 void eDVBScan::addChannelToScan(iDVBFrontendParameters *feparm)
 {
 		/* check if we don't already have that channel ... */
@@ -649,7 +689,7 @@ void eDVBScan::addChannelToScan(iDVBFrontendParameters *feparm)
 	{
 		eDVBFrontendParametersSatellite parm;
 		feparm->getDVBS(parm);
-		SCAN_eDebug("[eDVBScan] try to add sat %d %d %d %d %d %d",
+		SCAN_eDebug("[eDVBScan] try to add %d %d %d %d %d %d",
 			parm.orbital_position, parm.frequency, parm.symbol_rate, parm.polarisation, parm.fec, parm.modulation);
 		break;
 	}
@@ -657,7 +697,7 @@ void eDVBScan::addChannelToScan(iDVBFrontendParameters *feparm)
 	{
 		eDVBFrontendParametersCable parm;
 		feparm->getDVBC(parm);
-		SCAN_eDebug("[eDVBScan] try to add cable %d %d %d %d",
+		SCAN_eDebug("[eDVBScan] try to add %d %d %d %d",
 			parm.frequency, parm.symbol_rate, parm.modulation, parm.fec_inner);
 		break;
 	}
@@ -665,7 +705,7 @@ void eDVBScan::addChannelToScan(iDVBFrontendParameters *feparm)
 	{
 		eDVBFrontendParametersTerrestrial parm;
 		feparm->getDVBT(parm);
-		SCAN_eDebug("[eDVBScan] try to add terres %d %d %d %d %d %d %d %d",
+		SCAN_eDebug("[eDVBScan] try to add %d %d %d %d %d %d %d %d",
 			parm.frequency, parm.modulation, parm.transmission_mode, parm.hierarchy,
 			parm.guard_interval, parm.code_rate_LP, parm.code_rate_HP, parm.bandwidth);
 		break;
@@ -689,11 +729,11 @@ void eDVBScan::addChannelToScan(iDVBFrontendParameters *feparm)
 			if (!found_count)
 			{
 				*i = feparm;  // update
-				SCAN_eDebug("[eDVBScan]   update");
+				SCAN_eDebug("[eDVBScan] update");
 			}
 			else
 			{
-				SCAN_eDebug("[eDVBScan]   remove dupe");
+				SCAN_eDebug("[eDVBScan] remove dupe");
 				m_ch_toScan.erase(i++);
 				continue;
 			}
@@ -704,7 +744,7 @@ void eDVBScan::addChannelToScan(iDVBFrontendParameters *feparm)
 
 	if (found_count > 0)
 	{
-		SCAN_eDebug("[eDVBScan]   already in todo list");
+		SCAN_eDebug("[eDVBScan] already in todo list");
 		return;
 	}
 
@@ -712,7 +752,7 @@ void eDVBScan::addChannelToScan(iDVBFrontendParameters *feparm)
 	for (std::list<ePtr<iDVBFrontendParameters> >::const_iterator i(m_ch_scanned.begin()); i != m_ch_scanned.end(); ++i)
 		if (sameChannel(*i, feparm))
 		{
-			SCAN_eDebug("[eDVBScan]   successfully scanned");
+			SCAN_eDebug("[eDVBScan] successfully scanned");
 			return;
 		}
 
@@ -720,18 +760,18 @@ void eDVBScan::addChannelToScan(iDVBFrontendParameters *feparm)
 	for (std::list<ePtr<iDVBFrontendParameters> >::const_iterator i(m_ch_unavailable.begin()); i != m_ch_unavailable.end(); ++i)
 		if (sameChannel(*i, feparm, true))
 		{
-			SCAN_eDebug("[eDVBScan]   scanned but not available");
+			SCAN_eDebug("[eDVBScan] scanned but not available");
 			return;
 		}
 
 		/* ... on the current channel */
 	if (sameChannel(m_ch_current, feparm))
 	{
-		SCAN_eDebug("[eDVBScan]   is current");
+		SCAN_eDebug("[eDVBScan] is current");
 		return;
 	}
 
-	SCAN_eDebug("[eDVBScan]   really add");
+	SCAN_eDebug("[eDVBScan] really add");
 		/* otherwise, add it to the todo list. */
 	m_ch_toScan.push_front(feparm); // better.. then the rotor not turning wild from east to west :)
 }
@@ -804,10 +844,6 @@ void eDVBScan::channelDone()
 				SCAN_eDebug("[eDVBScan] ignoring NetworkId %d!", (*i)->getTableIdExtension());
 				continue;
 			}
-			else
-			{
-				SCAN_eDebug("[eDVBScan] m_networkid %d getTableIdExtension %d", m_networkid, (*i)->getTableIdExtension());
-			}
 
 			const TransportStreamInfoList &tsinfovec = *(*i)->getTsInfo();
 
@@ -818,6 +854,9 @@ void eDVBScan::channelDone()
 					(*tsinfo)->getOriginalNetworkId());
 				bool T2 = false;
 				eDVBFrontendParametersTerrestrial t2transponder;
+				eOriginalNetworkID onid = (*tsinfo)->getOriginalNetworkId();
+				eTransportStreamID tsid = (*tsinfo)->getTransportStreamId();
+				eDVBNamespace ns(0);
 
 				for (DescriptorConstIterator desc = (*tsinfo)->getDescriptors()->begin();
 						desc != (*tsinfo)->getDescriptors()->end(); ++desc)
@@ -846,8 +885,17 @@ void eDVBScan::channelDone()
 						eDVBFrontendParametersTerrestrial terr;
 						terr.set(d);
 						feparm->setDVBT(terr);
-
+						
+						unsigned long hash=0;
+						feparm->getHash(hash);
+						ns = buildNamespace(onid, tsid, hash);
+						
 						addChannelToScan(feparm);
+						break;
+					}
+					case LOGICAL_CHANNEL_DESCRIPTOR:
+					{
+						// we handle it later
 						break;
 					}
 					case S2_SATELLITE_DELIVERY_SYSTEM_DESCRIPTOR:
@@ -855,20 +903,8 @@ void eDVBScan::channelDone()
 						eDebug("[eDVBScan] S2_SATELLITE_DELIVERY_SYSTEM_DESCRIPTOR found");
 						if (system != iDVBFrontend::feSatellite)
 							break; // when current locked transponder is no satellite transponder ignore this descriptor
+
 						S2SatelliteDeliverySystemDescriptor &d = (S2SatelliteDeliverySystemDescriptor&)**desc;
-						ePtr<eDVBFrontendParameters> feparm = new eDVBFrontendParameters;
-						eDVBFrontendParametersSatellite sat;
-						sat.set(d);
-
-						eDVBFrontendParametersSatellite p;
-						m_ch_current->getDVBS(p);
-
-						if (p.is_id != sat.is_id || p.pls_mode != sat.pls_mode || p.pls_code != sat.pls_code)
-						{
-							p.set(d); //set multistream descriptor to current tuned data
-							feparm->setDVBS(p);
-							addChannelToScan(feparm);
-						}
 					}
 					case SATELLITE_DELIVERY_SYSTEM_DESCRIPTOR:
 					{
@@ -957,6 +993,42 @@ void eDVBScan::channelDone()
 					default:
 						SCAN_eDebug("[eDVBScan] descr<%x>", (*desc)->getTag());
 						break;
+					}
+				}
+				// we do this after the main loop because we absolutely need the namespace
+				for (DescriptorConstIterator desc = (*tsinfo)->getDescriptors()->begin();
+					desc != (*tsinfo)->getDescriptors()->end(); ++desc)
+				{
+					switch ((*desc)->getTag())
+					{
+						case LOGICAL_CHANNEL_DESCRIPTOR:
+						{
+							if (system != iDVBFrontend::feTerrestrial)
+								break; // when current locked transponder is no terrestrial transponder ignore this descriptor
+								
+							if (ns.get() == 0)
+								break; // invalid namespace
+								
+							int signal = 0;
+							ePtr<iDVBFrontend> fe;
+							
+							if (!m_channel->getFrontend(fe))
+								signal = fe->readFrontendData(iFrontendInformation_ENUMS::signalQuality);
+							
+							LogicalChannelDescriptor &d = (LogicalChannelDescriptor&)**desc;
+							for (LogicalChannelListConstIterator it = d.getChannelList()->begin(); it != d.getChannelList()->end(); it++)
+							{
+								LogicalChannel *ch = *it;
+								if (ch->getVisibleServiceFlag())
+								{
+									addLcnToDB(ns, onid, tsid, eServiceID(ch->getServiceId()), ch->getLogicalChannelNumber(), signal);
+									SCAN_eDebug("NAMESPACE: %08x TSID: %04x ONID: %04x SID: %04x LCN: %05d SIGNAL: %08d", ns.get(), onid.get(), tsid.get(), ch->getServiceId(), ch->getLogicalChannelNumber(), signal);
+								}
+							}
+							break;
+						}
+						default:
+							break;
 					}
 				}
 			}
@@ -1115,7 +1187,6 @@ void eDVBScan::channelDone()
 
 		if (!(m_flags & scanOnlyFree) || !m_pmt_in_progress->second.scrambled) {
 			SCAN_eDebug("[eDVBScan] add not scrambled!");
-			m_new_servicerefs.push_back(ref);
 			std::pair<std::map<eServiceReferenceDVB, ePtr<eDVBService> >::iterator, bool> i =
 				m_new_services.insert(std::pair<eServiceReferenceDVB, ePtr<eDVBService> >(ref, service));
 			if (i.second)
@@ -1187,8 +1258,27 @@ void eDVBScan::start(const eSmartPtrList<iDVBFrontendParameters> &known_transpon
 	m_new_channels.clear();
 	m_tuner_data.clear();
 	m_new_services.clear();
-	m_new_servicerefs.clear();
 	m_last_service = m_new_services.end();
+
+	if (m_lcn_file)
+		fclose(m_lcn_file);
+		
+	if (m_flags & scanRemoveServices)
+	{
+		m_lcn_file = fopen(eEnv::resolve("${sysconfdir}/enigma2/lcndb").c_str(), "w");
+		if (!m_lcn_file)
+			eDebug("[eDVBScan] couldn't open file lcndb");
+	}
+	else
+	{
+		m_lcn_file = fopen(eEnv::resolve("${sysconfdir}/enigma2/lcndb").c_str(), "r+");
+		if (!m_lcn_file)
+		{
+			m_lcn_file = fopen(eEnv::resolve("${sysconfdir}/enigma2/lcndb").c_str(), "w");
+			if (!m_lcn_file)
+				eDebug("[eDVBScan] couldn't open file lcndb");
+		}
+	}
 
 	if (m_flags & scanBlindSearch)
 	{
@@ -1222,6 +1312,7 @@ void eDVBScan::start(const eSmartPtrList<iDVBFrontendParameters> &known_transpon
 		SCAN_eDebug("[eDVBScan] blind scan requested");
 		transponderlist = &m_ch_blindscan;
 	}
+
 
 	for (eSmartPtrList<iDVBFrontendParameters>::const_iterator i(known_transponders.begin()); i != known_transponders.end(); ++i)
 	{
@@ -1450,10 +1541,10 @@ void eDVBScan::insertInto(iDVBChannelList *db, bool backgroundscanresult)
 		{
 			bouquet->m_bouquet_name = "Last Scanned";
 
-			for (std::vector<eServiceReferenceDVB>::const_iterator
-				service(m_new_servicerefs.begin()); service != m_new_servicerefs.end(); ++service)
+			for (std::map<eServiceReferenceDVB, ePtr<eDVBService> >::const_iterator
+				service(m_new_services.begin()); service != m_new_services.end(); ++service)
 			{
-				bouquet->m_services.push_back(*service);
+				bouquet->m_services.push_back(service->first);
 			}
 			bouquet->flushChanges();
 			eDVBDB::getInstance()->renumberBouquet();
@@ -1485,11 +1576,11 @@ RESULT eDVBScan::processSDT(eDVBNamespace dvbnamespace, const ServiceDescription
 		{
 			if (it->second.scrambled)
 			{
-				SCAN_eDebugNoNewLine("is scrambled!");
+				SCAN_eDebugNoNewLineEnd("is scrambled!");
 				is_crypted = true;
 			}
 			else
-				SCAN_eDebugNoNewLine("is free");
+				SCAN_eDebugNoNewLineEnd("is free");
 		}
 		SCAN_eDebugNoNewLine("\n");
 
@@ -1546,7 +1637,7 @@ RESULT eDVBScan::processSDT(eDVBNamespace dvbnamespace, const ServiceDescription
 				{
 					CaIdentifierDescriptor &d = (CaIdentifierDescriptor&)**desc;
 					const CaSystemIdList &caids = *d.getCaSystemIds();
-					SCAN_eDebugNoNewLineStart("[eDVBScan]   CA");
+					SCAN_eDebugNoNewLineStart("[eDVBScan] CA");
 					for (CaSystemIdList::const_iterator i(caids.begin()); i != caids.end(); ++i)
 					{
 						SCAN_eDebugNoNewLine(" %04x", *i);
@@ -1564,7 +1655,6 @@ RESULT eDVBScan::processSDT(eDVBNamespace dvbnamespace, const ServiceDescription
 			if (is_crypted and !service->m_ca.size())
 				service->m_ca.push_front(0);
 
-			m_new_servicerefs.push_back(ref);
 			std::pair<std::map<eServiceReferenceDVB, ePtr<eDVBService> >::iterator, bool> i =
 				m_new_services.insert(std::pair<eServiceReferenceDVB, ePtr<eDVBService> >(ref, service));
 
@@ -1672,7 +1762,6 @@ RESULT eDVBScan::processVCT(eDVBNamespace dvbnamespace, const VirtualChannelTabl
 			if (is_crypted and !service->m_ca.size())
 				service->m_ca.push_front(0);
 
-			m_new_servicerefs.push_back(ref);
 			std::pair<std::map<eServiceReferenceDVB, ePtr<eDVBService> >::iterator, bool> i =
 				m_new_services.insert(std::pair<eServiceReferenceDVB, ePtr<eDVBService> >(ref, service));
 

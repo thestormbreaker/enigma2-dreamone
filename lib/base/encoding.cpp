@@ -15,19 +15,16 @@ inline char tolower(char c)
 
 int mapEncoding(char *s_table)
 {
-	int encoding = 0;
+	int encoding = -1;
 	int ex_table_flag = 0;
 
 	//if encoding string has a option 'N' or 'NOID' first split by ':' , it indicates that the string has no
-	//encoding id char in the first byte, and the bit 0x0800 of encoding id will be set. if encoding string 
-        //has a option 'E' or 'ENFORCE' first split by ':' , it indicates that the string encode by provide value,
-        //and skip the first encode byte, and the bit 0x0100 of encoding id will be set.
-
+	//     encoding id char in the first byte, and the bit 0x80 of encoding id will be set.
 	char *colon=strrchr(s_table, ':');
 	if(colon != NULL){
 		if(strncmp(s_table,"n:",2) == 0 || strncmp(s_table,"noid:",5) == 0 )
 			ex_table_flag |= MASK_NO_TABLEID;
-		else if(strncmp(s_table,"e:",2) == 0 || strncmp(s_table,"enforce:",8) == 0 )
+                else if(strncmp(s_table,"e:",2) == 0 || strncmp(s_table,"enforce:",8) == 0 )
 			ex_table_flag |= MASK_IGNORE_TABLEID;
 		s_table = colon + 1;
 	}

@@ -108,11 +108,7 @@ bool eAVSwitch::haveScartSwitch()
 		eDebug("[eAVSwitch] cannot open /proc/stb/avs/0/input_choices: %m");
 		return false;
 	}
-	if (read(fd, tmp, 255) < 1)
-	{
-		eDebug("[eAVSwitch] failed to read data from /proc/stb/avs/0/input_choices: %m");
-		return false;
-	}
+	read(fd, tmp, 255);
 	close(fd);
 	return !!strstr(tmp, "scart");
 }
@@ -136,10 +132,7 @@ void eAVSwitch::setInput(int val)
 		return;
 	}
 
-	if (write(fd, input[val], strlen(input[val])) < 0)
-	{
-		eDebug("[eAVSwitch] setInput failed %m");
-	}
+	write(fd, input[val], strlen(input[val]));
 	close(fd);
 }
 
@@ -174,11 +167,7 @@ void eAVSwitch::setColorFormat(int format)
 		eDebug("[eAVSwitch] cannot open /proc/stb/avs/0/colorformat: %m");
 		return;
 	}
-
-	if (write(fd, fmt, strlen(fmt)) < 1)
-	{
-		eDebug("[eAVSwitch] setColorFormat failed %m");
-	}
+	write(fd, fmt, strlen(fmt));
 	close(fd);
 }
 
@@ -202,10 +191,7 @@ void eAVSwitch::setAspectRatio(int ratio)
 		return;
 	}
 //	eDebug("set aspect to %s", aspect[ratio]);
-	if (write(fd, aspect[ratio], strlen(aspect[ratio])) < 1)
-	{
-		eDebug("[eAVSwitch] setAspectRatio failed %m");
-	}
+	write(fd, aspect[ratio], strlen(aspect[ratio]));
 	close(fd);
 
 	if((fd = open("/proc/stb/video/policy", O_WRONLY)) < 0) {
@@ -213,12 +199,15 @@ void eAVSwitch::setAspectRatio(int ratio)
 		return;
 	}
 //	eDebug("set ratio to %s", policy[ratio]);
-	if (write(fd, policy[ratio], strlen(policy[ratio])) < 1)
-	{
-		eDebug("[eAVSwitch] setAspectRatio policy failed %m");
-	}
+	write(fd, policy[ratio], strlen(policy[ratio]));
 	close(fd);
 
+//	if((fd = open("/proc/stb/video/policy2", O_WRONLY)) < 0) {
+//		eDebug("cannot open /proc/stb/video/policy2");
+//		return;
+//	}
+//	write(fd, policy[ratio], strlen(policy[ratio]));
+//	close(fd);
 }
 
 void eAVSwitch::setVideomode(int mode)
@@ -242,14 +231,8 @@ void eAVSwitch::setVideomode(int mode)
 			close(fd1);
 			return;
 		}
-		if (write(fd1, pal, strlen(pal)) < 1)
-		{
-			eDebug("[eAVSwitch] setVideomode pal failed %m");
-		}
-		if (write(fd2, ntsc, strlen(ntsc)) < 1)
-		{
-			eDebug("[eAVSwitch] setVideomode ntsc failed %m");
-		}
+		write(fd1, pal, strlen(pal));
+		write(fd2, ntsc, strlen(ntsc));
 		close(fd1);
 		close(fd2);
 	}
@@ -262,16 +245,10 @@ void eAVSwitch::setVideomode(int mode)
 		}
 		switch(mode) {
 			case 0:
-				if (write(fd, pal, strlen(pal)) < 1)
-				{
-					eDebug("[eAVSwitch] setVideomode pal failed %m");
-				}
+				write(fd, pal, strlen(pal));
 				break;
 			case 1:
-				if (write(fd, ntsc, strlen(ntsc)) < 1)
-				{
-					eDebug("[eAVSwitch] setVideomode ntsc failed %m");
-				}
+				write(fd, ntsc, strlen(ntsc));
 				break;
 			default:
 				eDebug("[eAVSwitch] unknown videomode %d", mode);
@@ -294,10 +271,7 @@ void eAVSwitch::setWSS(int val) // 0 = auto, 1 = auto(4:3_off)
 		"14:9_letterbox_center", "14:9_letterbox_top", "16:9_letterbox_center",
 		"16:9_letterbox_top", ">16:9_letterbox_center", "14:9_full_format"
 	};
-	if (write(fd, wss[val], strlen(wss[val])) < 1)
-	{
-		eDebug("[eAVSwitch] setWSS failed %m");
-	}
+	write(fd, wss[val], strlen(wss[val]));
 //	eDebug("set wss to %s", wss[val]);
 	close(fd);
 }

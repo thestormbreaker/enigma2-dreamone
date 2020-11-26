@@ -10,14 +10,17 @@ base_libenigma_base_a_SOURCES = \
 	base/ebase.cpp \
 	base/eenv.cpp \
 	base/eerror.cpp \
+	base/eerroroutput.cpp \
 	base/elock.cpp \
 	base/encoding.cpp \
 	base/estring.cpp \
+	base/etpm.cpp \
 	base/freesatv2.cpp \
 	base/huffman.cpp \
 	base/init.cpp \
 	base/ioprio.cpp \
 	base/message.cpp \
+	base/modelinformation.cpp \
 	base/nconfig.cpp \
 	base/rawfile.cpp \
 	base/smartptr.cpp \
@@ -39,10 +42,12 @@ baseinclude_HEADERS = \
 	base/ebase.h \
 	base/eenv.h \
 	base/eerror.h \
+	base/eerroroutput.h \
 	base/elock.h \
 	base/encoding.h \
 	base/eptrlist.h \
 	base/estring.h \
+	base/etpm.h \
 	base/freesatv2.h \
 	base/huffman.h \
 	base/i18n.h \
@@ -51,6 +56,7 @@ baseinclude_HEADERS = \
 	base/init_num.h \
 	base/ioprio.h \
 	base/message.h \
+	base/modelinformation.h \
 	base/nconfig.h \
 	base/object.h \
 	base/rawfile.h \
@@ -59,4 +65,7 @@ baseinclude_HEADERS = \
 	base/thread.h \
 	base/httpsstream.h \
 	base/httpstream.h \
-	base/wrappers.h
+	base/wrappers.h \
+	base/connection.h \
+	base/sigc.h \
+	base/io.h

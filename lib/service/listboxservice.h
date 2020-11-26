@@ -6,6 +6,7 @@
 #include <lib/service/iservice.h>
 #include <lib/python/python.h>
 #include <set>
+#include <lib/nav/core.h>
 
 class eListboxServiceContent: public virtual iListboxContent
 {
@@ -21,6 +22,7 @@ public:
 	void setIgnoreService( const eServiceReference &service );
 	void setRoot(const eServiceReference &ref, bool justSet=false);
 	void getCurrent(eServiceReference &ref);
+
 	void getPrev(eServiceReference &ref);
 	void getNext(eServiceReference &ref);
 
@@ -53,9 +55,13 @@ public:
 		celServiceNumber,
 		celMarkerPixmap,
 		celFolderPixmap,
+		celPiconPixmap,
+		celRecordServicePixmap,
 		celServiceEventProgressbar,
 		celServiceName,
+		celServiceTime,
 		celServiceInfo, // "now" event
+		celNextEventInfo,
 		celServiceTypePixmap,
 		celElements
 	};
@@ -68,6 +74,8 @@ public:
 		picServiceGroup,
 		picFolder,
 		picMarker,
+		picPicon,
+		picRecordService,
 		picServiceEventProgressbar,
 		picCrypto,
 		picRecord,
@@ -85,14 +93,21 @@ public:
 	int getItemHeight() { return m_itemheight; }
 	void setItemHeight(int height);
 	void setHideNumberMarker(bool doHide) { m_hide_number_marker = doHide; }
+	void setShowTwoLines(bool twoLines) { m_show_two_lines = twoLines; }
+	void setProgressViewMode(int mode) { m_progress_view_mode = mode; }
+	void setProgressTextWidth(int value) { m_progress_text_width = value; }
+	void setServicePiconDownsize(int value) { m_service_picon_downsize = value; }
+	void setServicePiconRatio(int value) { m_service_picon_ratio = value; }
 	void setServiceTypeIconMode(int mode) { m_servicetype_icon_mode = mode; }
 	void setCryptoIconMode(int mode) { m_crypto_icon_mode = mode; }
 	void setRecordIndicatorMode(int mode) { m_record_indicator_mode = mode; }
 	void setColumnWidth(int value) { m_column_width = value; }
-	void setProgressbarHeight(int value) {	m_progressbar_height = value; }
+	void setProgressbarHeight(int value) { m_progressbar_height = value; }
 	void setProgressbarBorderWidth(int value) { m_progressbar_border_width = value; }
 	void setNonplayableMargins(int value) { m_nonplayable_margins = value; }
 	void setItemsDistances(int value) { m_items_distances = value; }
+
+	void setProgressUnit(const std::string &string) { m_progress_unit = string; }
 
 	static void setGetPiconNameFunc(SWIG_PYOBJECT(ePyObject) func);
 
@@ -115,11 +130,17 @@ public:
 		serviceEventProgressbarBorderColor,
 		serviceEventProgressbarBorderColorSelected,
 		serviceRecorded,
+		servicePseudoRecorded,
+		serviceStreamed,
+		serviceRecordingColor,
+		serviceAdvertismentColor,
+		serviceDescriptionColor,
+		serviceDescriptionColorSelected,
 		colorElements
 	};
 
 	void setColor(int color, gRGB &col);
-	bool checkServiceIsRecorded(eServiceReference ref);
+	bool checkServiceIsRecorded(eServiceReference ref,pNavigation::RecordType type=pNavigation::isAnyRecording);
 protected:
 	void cursorHome();
 	void cursorEnd();
@@ -174,6 +195,11 @@ private:
 
 	int m_itemheight;
 	bool m_hide_number_marker;
+	bool m_show_two_lines;
+	int m_progress_view_mode;
+	int m_progress_text_width;
+	int m_service_picon_downsize;
+	int m_service_picon_ratio;
 	int m_servicetype_icon_mode;
 	int m_crypto_icon_mode;
 	int m_record_indicator_mode;
@@ -182,6 +208,8 @@ private:
 	int m_progressbar_border_width;
 	int m_nonplayable_margins;
 	int m_items_distances;
+
+	std::string m_progress_unit;
 };
 
 #endif

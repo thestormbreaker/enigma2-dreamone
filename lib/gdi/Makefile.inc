@@ -1,6 +1,6 @@
 noinst_LIBRARIES += gdi/libenigma_gdi.a
 
-gdi_libenigma_gdi_a_CXXFLAGS = $(LIBSDL_CFLAGS)
+gdi_libenigma_gdi_CXXFLAGS = $(LIBSDL_CFLAGS)
 
 gdi_libenigma_gdi_a_SOURCES = \
 	gdi/accel.cpp \
@@ -20,8 +20,8 @@ gdi_libenigma_gdi_a_SOURCES = \
 	gdi/lcd.cpp \
 	gdi/picexif.cpp \
 	gdi/picload.cpp \
-	gdi/pixmapcache.cpp \
-	gdi/region.cpp
+	gdi/region.cpp \
+        gdi/stmfb.cpp
 
 gdiincludedir = $(pkgincludedir)/lib/gdi
 gdiinclude_HEADERS = \
@@ -41,7 +41,6 @@ gdiinclude_HEADERS = \
 	gdi/lcd.h \
 	gdi/picexif.h \
 	gdi/picload.h \
-	gdi/pixmapcache.h \
 	gdi/region.h
 
 if HAVE_LIBSDL

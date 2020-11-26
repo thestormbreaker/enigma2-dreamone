@@ -11,6 +11,8 @@
 
 #ifndef SWIG
 
+#include <time.h>
+
 #include <vector>
 #include <list>
 #include <tr1/unordered_map>
@@ -33,6 +35,58 @@
 #include <lib/base/message.h>
 #include <lib/service/event.h>
 #include <lib/python/python.h>
+
+#define MjdToEpochTime(x) (((x##_hi << 8 | x##_lo)-40587)*86400)
+#define BcdTimeToSeconds(x) ((3600 * ((10*((x##_h & 0xF0)>>4)) + (x##_h & 0xF))) + (60 * ((10*((x##_m & 0xF0)>>4)) + (x##_m & 0xF))) + ((10*((x##_s & 0xF0)>>4)) + (x##_s & 0xF)))
+
+#ifdef ENABLE_MHW_EPG
+
+#define FILE_EQUIV "/etc/mhw_Equiv.epg"
+#define FILE_CHANNELS "/etc/mhw_Chann.epg"
+#define FILE_LOG "/tmp/mhw_Log.epg"
+
+#define EPG_REPLAY_LEN 8
+
+typedef struct epg_replay {
+	u_char channel_id							:8;
+	u_char replay_mjd_hi						:8;
+	u_char replay_mjd_lo						:8;
+	u_char replay_time_h						:8;
+	u_char replay_time_m						:8;
+	u_char replay_time_s						:8;
+	u_char reserv1								:8;
+#if BYTE_ORDER == BIG_ENDIAN
+	u_char last									:1;
+	u_char										:1;
+	u_char vo									:1;
+	u_char vm									:1;
+	u_char										:3;
+	u_char subtitles							:1;
+#else
+	u_char subtitles							:1;
+	u_char										:3;
+	u_char vm									:1;
+	u_char vo									:1;
+	u_char										:1;
+	u_char last									:1;
+#endif
+} epg_replay_t;
+
+typedef struct {
+	u_char original_nid_hi;
+	u_char original_nid_lo;
+	u_char original_tid_hi;
+	u_char original_tid_lo;
+	u_char original_sid_hi;
+	u_char original_sid_lo;
+	u_char equiv_nid_hi;
+	u_char equiv_nid_lo;
+	u_char equiv_tid_hi;
+	u_char equiv_tid_lo;
+	u_char equiv_sid_hi;
+	u_char equiv_sid_lo;
+} mhw_channel_equiv_t;
+#endif
 
 struct eventData;
 class eServiceReferenceDVB;
@@ -88,8 +142,8 @@ struct uniqueEPGKey
 typedef std::map<uint16_t, eventData*> eventMap;
 //timeMap is sorted by beginTime
 typedef std::map<time_t, eventData*> timeMap;
-
 typedef std::map<eDVBChannelID, time_t> updateMap;
+typedef std::set<uint32_t> tidMap;
 
 struct hash_uniqueEPGKey
 {
@@ -102,6 +156,8 @@ struct hash_uniqueEPGKey
 struct EventCacheItem {
 	eventMap byEvent;
 	timeMap byTime;
+	int sources;
+	EventCacheItem(): sources(0) {}
 };
 
 typedef std::set<uint32_t> tidMap;
@@ -134,8 +190,45 @@ public:
 };
 #endif
 
+#ifndef SWIG
+
+struct eit_parental_rating {
+	u_char	country_code[3];
+	u_char	rating;
+};
+#endif
+
 class eEPGCache: public eMainloop, private eThread, public sigc::trackable
 {
+public:
+	enum eit_type_t {PRIVATE=0, NOWNEXT=1, SCHEDULE=2, SCHEDULE_OTHER=4
+#ifdef ENABLE_MHW_EPG
+	,MHW=8
+#endif
+#ifdef ENABLE_FREESAT
+	,FREESAT_NOWNEXT=16
+	,FREESAT_SCHEDULE=32
+	,FREESAT_SCHEDULE_OTHER=64
+#endif
+	,VIASAT=256
+#ifdef ENABLE_NETMED
+	,NETMED_SCHEDULE=512
+	,NETMED_SCHEDULE_OTHER=1024
+#endif
+#ifdef ENABLE_VIRGIN
+	,VIRGIN_NOWNEXT=2048
+	,VIRGIN_SCHEDULE=4096
+#endif
+#ifdef ENABLE_ATSC
+	,ATSC_EIT=8192
+#endif
+#ifdef ENABLE_OPENTV
+	,OPENTV=16384
+#endif
+	,EPG_IMPORT=0x80000000
+	};
+
+private:
 #ifndef SWIG
 	DECLARE_REF(eEPGCache)
 	struct channel_data: public sigc::trackable
@@ -180,6 +273,7 @@ class eEPGCache: public eMainloop, private eThread, public sigc::trackable
 #endif
 #ifdef ENABLE_MHW_EPG
 		std::vector<mhw_channel_name_t> m_channels;
+		std::vector<mhw_channel_equiv_t> m_equiv;
 		std::map<uint8_t, mhw_theme_name_t> m_themes;
 		std::map<uint32_t, mhw_title_t> m_titles;
 		std::multimap<uint32_t, uint32_t> m_program_ids;
@@ -192,6 +286,7 @@ class eEPGCache: public eMainloop, private eThread, public sigc::trackable
 		void MHWTimeout() { m_MHWTimeoutet=true; }
 		void readMHWData(const uint8_t *data);
 		void readMHWData2(const uint8_t *data);
+		void readMHWData2_old(const uint8_t *data);
 		void startMHWReader(uint16_t pid, uint8_t tid);
 		void startMHWReader2(uint16_t pid, uint8_t tid, int ext=-1);
 		void startMHWTimeout(int msek);
@@ -202,6 +297,11 @@ class eEPGCache: public eMainloop, private eThread, public sigc::trackable
 		void timeMHW2DVB( int minutes, u_char *return_time);
 		void timeMHW2DVB( u_char day, u_char hours, u_char minutes, u_char *return_time);
 		void storeMHWTitle(std::map<uint32_t, mhw_title_t>::iterator itTitle, std::string sumText, const uint8_t *data);
+		void GetEquiv(void);
+		int nb_equiv;
+		bool log_open ();
+		void log_close();
+		void log_add (const char *message, ...);
 #endif
 #ifdef ENABLE_ATSC
 		int m_atsc_eit_index;
@@ -257,14 +357,16 @@ class eEPGCache: public eMainloop, private eThread, public sigc::trackable
 		void OPENTV_SummariesSection(const uint8_t *d);
 		void cleanupOPENTV();
 #endif
-		void readData(const uint8_t *data, int source);
+		void readData(const uint8_t *data, eEPGCache::eit_type_t source);
 		void startChannel();
 		void startEPG();
 		void finishEPG();
 		void abortEPG();
 		void abortNonAvail();
 	};
-	bool FixOverlapping(EventCacheItem &servicemap, time_t TM, int duration, const timeMap::iterator &tm_it, const uniqueEPGKey &service);
+
+	typedef std::map<iDVBChannel*, channel_data*>::iterator channelMapIterator;
+
 public:
 	struct Message
 	{
@@ -316,6 +418,7 @@ private:
 
 	unsigned int enabledSources;
 	unsigned int historySeconds;
+	unsigned int maxdays;
 
 	std::vector<int> onid_blacklist;
 	std::map<std::string,int> customeitpids;
@@ -323,6 +426,7 @@ private:
 	updateMap channelLastUpdated;
 	std::string m_filename;
 	bool m_running;
+	bool load_epg;
 
 #ifdef ENABLE_PRIVATE_EPG
 	contentMaps content_time_tables;
@@ -333,10 +437,11 @@ private:
 #ifdef ENABLE_PRIVATE_EPG
 	void privateSectionRead(const uniqueEPGKey &, const uint8_t *);
 #endif
-	void sectionRead(const uint8_t *data, int source, channel_data *channel);
+	void sectionRead(const uint8_t *data, eit_type_t source, channel_data *channel);
 	void gotMessage(const Message &message);
 	void cleanLoop();
-	void submitEventData(const std::vector<int>& sids, const std::vector<eDVBChannelID>& chids, long start, long duration, const char* title, const char* short_summary, const char* long_description, char event_type, int source);
+	void submitEventData(const std::vector<int>& sids, const std::vector<eDVBChannelID>& chids, long start, long duration, const char* title, const char* short_summary, const char* long_description, char event_type, eit_type_t source, uint16_t eventId=0);
+	void submitEventData(const std::vector<int>& sids, const std::vector<eDVBChannelID>& chids, long start, long duration, const char* title, const char* short_summary, const char* long_description, std::vector<uint8_t> event_types, std::vector<eit_parental_rating> parental_ratings, eit_type_t source, uint16_t eventId=0);
 
 // called from main thread
 	void DVBChannelAdded(eDVBChannel*);
@@ -353,9 +458,11 @@ public:
 	static eEPGCache *getInstance() { return instance; }
 
 	void crossepgImportEPGv21(std::string dbroot);
+	void clear();
 	void save();
 	void load();
 	void timeUpdated();
+	void flushEPG(int sid, int onid, int tsid);
 	void flushEPG(const uniqueEPGKey & s=uniqueEPGKey());
 #ifndef SWIG
 	eEPGCache();
@@ -391,15 +498,17 @@ public:
 		SIMILAR_BROADCASTINGS_SEARCH,
 		EXAKT_TITLE_SEARCH,
 		PARTIAL_TITLE_SEARCH,
-		START_TITLE_SEARCH,
-		END_TITLE_SEARCH,
-		PARTIAL_DESCRIPTION_SEARCH
+		PARTIAL_DESCRIPTION_SEARCH,
+        START_TITLE_SEARCH
 	};
 	enum {
 		CASE_CHECK,
-		NO_CASE_CHECK
+		NO_CASE_CHECK,
+        REGEX_CHECK
 	};
+
 	PyObject *lookupEvent(SWIG_PYOBJECT(ePyObject) list, SWIG_PYOBJECT(ePyObject) convertFunc=(PyObject*)0);
+	const char* casetypestr(int value);
 	PyObject *search(SWIG_PYOBJECT(ePyObject));
 
 	/* Used by servicedvbrecord.cpp, timeshift, etc. to write the EIT file */
@@ -411,40 +520,16 @@ public:
 	SWIG_VOID(RESULT) lookupEventTime(const eServiceReference &service, time_t, ePtr<eServiceEvent> &SWIG_OUTPUT, int direction=0);
 	SWIG_VOID(RESULT) getNextTimeEntry(ePtr<eServiceEvent> &SWIG_OUTPUT);
 
-	enum {PRIVATE=0, NOWNEXT=1, SCHEDULE=2, SCHEDULE_OTHER=4
-#ifdef ENABLE_MHW_EPG
-	,MHW=8
-#endif
-#ifdef ENABLE_FREESAT
-	,FREESAT_NOWNEXT=16
-	,FREESAT_SCHEDULE=32
-	,FREESAT_SCHEDULE_OTHER=64
-#endif
-	,VIASAT=256
-#ifdef ENABLE_NETMED
-	,NETMED_SCHEDULE=512
-	,NETMED_SCHEDULE_OTHER=1024
-#endif
-#ifdef ENABLE_VIRGIN
-	,VIRGIN_NOWNEXT=2048
-	,VIRGIN_SCHEDULE=4096
-#endif
-#ifdef ENABLE_ATSC
-	,ATSC_EIT=8192
-#endif
-#ifdef ENABLE_OPENTV
-	,OPENTV=16384
-#endif
-	,EPG_IMPORT=0x80000000
-	};
+	void setEpgmaxdays(unsigned int epgmaxdays);
 	void setEpgHistorySeconds(time_t seconds);
 	void setEpgSources(unsigned int mask);
 	unsigned int getEpgSources();
+	unsigned int getEpgmaxdays();
 
-	void submitEventData(const std::vector<eServiceReferenceDVB>& serviceRefs, long start, long duration, const char* title, const char* short_summary, const char* long_description, char event_type);
+	void submitEventData(const std::vector<eServiceReferenceDVB>& serviceRefs, long start, long duration, const char* title, const char* short_summary, const char* long_description, std::vector<uint8_t> event_types, std::vector<eit_parental_rating> parental_ratings, uint16_t eventId=0);
 
 	void importEvents(SWIG_PYOBJECT(ePyObject) serviceReferences, SWIG_PYOBJECT(ePyObject) list);
-	void importEvent(SWIG_PYOBJECT(ePyObject) serviceReference, SWIG_PYOBJECT(ePyObject) list);
+	void importEvent(SWIG_PYOBJECT(ePyObject) serviceReferences, SWIG_PYOBJECT(ePyObject) list);
 };
 
 #endif
