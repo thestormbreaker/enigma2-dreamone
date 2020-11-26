@@ -859,7 +859,6 @@ data/display128dm/Makefile
 data/display220/Makefile
 data/display390/Makefile
 data/display400/Makefile
-data/display400dm/Makefile
 data/display480/Makefile
 data/display480/OBH-LCDskin/Makefile
 data/display720/Makefile
